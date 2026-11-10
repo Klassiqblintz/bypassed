@@ -194,9 +194,8 @@ class VirtualCameraService : Service() {
                         }
                     }
 
-                    val outIdx = decoder.dequeueOutputBuffer(
-                        object : MediaCodec.BufferInfo() {}, FRAME_DURATION_MS
-                    )
+                    val info = MediaCodec.BufferInfo()
+                    val outIdx = decoder.dequeueOutputBuffer(info, FRAME_DURATION_MS)
                     when {
                         outIdx >= 0 -> {
                             decoder.releaseOutputBuffer(outIdx, false)
