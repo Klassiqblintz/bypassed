@@ -64,13 +64,13 @@ class MainActivity : ComponentActivity() {
                                 onClick = { currentScreen = Screen.DASHBOARD }
                             )
                             NavigationBarItem(
-                                icon = { Icon(Icons.Default.Devices, "Targets") },
+                                icon = { Icon(Icons.Default.Dashboard, "Targets") },
                                 label = { Text("Targets") },
                                 selected = currentScreen == Screen.TARGETS,
                                 onClick = { currentScreen = Screen.TARGETS }
                             )
                             NavigationBarItem(
-                                icon = { Icon(Icons.Default.Image, "Media") },
+                                icon = { Icon(Icons.Default.Photo, "Media") },
                                 label = { Text("Media") },
                                 selected = currentScreen == Screen.MEDIA,
                                 onClick = { currentScreen = Screen.MEDIA }

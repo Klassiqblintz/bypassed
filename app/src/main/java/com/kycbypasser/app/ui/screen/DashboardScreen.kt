@@ -90,7 +90,7 @@ fun DashboardScreen() {
                     )
                 ) {
                     Icon(
-                        imageVector = if (isActive) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                        imageVector = if (isActive) Icons.Default.CheckCircle else Icons.Default.Clear,
                         contentDescription = null
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -105,13 +105,13 @@ fun DashboardScreen() {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             StatCard(
-                icon = Icons.Default.Devices,
+                icon = Icons.Default.Dashboard,
                 title = "Targets",
                 value = targetCount.toString(),
                 modifier = Modifier.weight(1f)
             )
             StatCard(
-                icon = Icons.Default.Image,
+                icon = Icons.Default.Photo,
                 title = "Image",
                 value = if (hasImage) "SET" else "NONE",
                 modifier = Modifier.weight(1f)
@@ -123,13 +123,13 @@ fun DashboardScreen() {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             StatCard(
-                icon = Icons.Default.VideoLibrary,
+                icon = Icons.Default.PlayArrow,
                 title = "Video",
                 value = if (hasVideo) "SET" else "NONE",
                 modifier = Modifier.weight(1f)
             )
             StatCard(
-                icon = Icons.Default.Shield,
+                icon = Icons.Default.Security,
                 title = "Mode",
                 value = "STATIC",
                 modifier = Modifier.weight(1f)
@@ -158,7 +158,7 @@ fun DashboardScreen() {
                         .fillMaxWidth()
                         .padding(bottom = 8.dp)
                 ) {
-                    Icon(Icons.Default.Devices, null)
+                    Icon(Icons.Default.Dashboard, null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("MANAGE TARGETS")
                 }
@@ -167,7 +167,7 @@ fun DashboardScreen() {
                     onClick = { /* Navigate to media */ },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Image, null)
+                    Icon(Icons.Default.Photo, null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("MANAGE MEDIA")
                 }
