@@ -15,6 +15,8 @@ import com.kycbypasser.app.ui.screen.DashboardScreen
 import com.kycbypasser.app.ui.screen.TargetsScreen
 import com.kycbypasser.app.ui.screen.MediaScreen
 import com.kycbypasser.app.ui.screen.SettingsScreen
+import com.kycbypasser.app.ui.theme.CardBackground
+import com.kycbypasser.app.ui.theme.CyanAccent
 
 /**
  * Main activity with bottom navigation between the four main screens.
