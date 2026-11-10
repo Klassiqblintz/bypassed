@@ -137,7 +137,7 @@ class VirtualCameraService : Service() {
             surfaceTexture = android.graphics.SurfaceTexture(1)
             surfaceTexture?.setDefaultBufferSize(720, 1280)
             surface = android.view.Surface(surfaceTexture)
-            Log.d(LOG_TAG, "Surface created, texture id = ${surfaceTexture?.getTextureId()}")
+            Log.d(LOG_TAG, "Surface created")
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to create surface: ${e.message}", e)
         }
