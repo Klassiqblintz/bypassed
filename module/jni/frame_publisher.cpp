@@ -3,89 +3,113 @@
  * Decodes images/videos and publishes them as camera frames.
  *
  * STATIC mode: Loads a JPEG/PNG and returns it as each frame.
- * VIDEO mode:  Decodes an MP4 using MediaCodec and loops frames.
- * REALTIME mode: Uses OpenCV face detection + warp for live face swap.
+ * VIDEO mode:  Decodes an MP4 using NDK MediaCodec and loops frames.
+ * REALTIME mode: Returns static frame (simplified, no OpenCV).
  * Each frame is rendered to a SurfaceTexture via EGL.
  */
 #include "frame_publisher.h"
-#include "face_detector.h"
 #include "camera_hook.h"
+#include <media/NdkMediaCodec.h>
+#include <media/NdkMediaExtractor.h>
+#include <media/NdkMediaFormat.h>
+#include <android/native_window.h>
+#include <android/native_window_jni.h>
 #include <android/log.h>
 #include <dlfcn.h>
 #include <sys/time.h>
+#include <cstring>
+#include <unistd.h>
 
 static bool s_initialized = false;
 static int s_mode = MODE_STATIC;
 static char s_image_path[512] = "";
 static char s_video_path[512] = "";
 static int s_fps = 30;
-static uint8_t *s_image_data = nullptr;
-static int s_image_width = 0;
-static int s_image_height = 0;
-static sp<MediaExtractor> s_extractor = nullptr;
-static sp<MediaCodec> s_decoder = nullptr;
-static size_t s_video_track_index = 0;
-static bool s_video_playing = false;
-static int64_t s_video_duration_us = 0;
-static int64_t s_video_current_time_us = 0;
 static int64_t s_last_frame_time = 0;
 
+// For static mode
+static jobject s_bitmap = nullptr;
+
+// For video mode
+static AMediaExtractor* s_extractor = nullptr;
+static AMediaCodec* s_decoder = nullptr;
+static jobject s_surface_obj = nullptr;  // Java Surface object
+static int s_video_track_index = -1;
+static bool s_video_eof = false;
+
+static int get_video_track_from_format(AMediaFormat* fmt) {
+    const char* mime = nullptr;
+    AMediaFormat_getString(fmt, AMEDIAFORMAT_KEY_MIME, &mime);
+    if (mime && strstr(mime, "video/") == mime) {
+        return 1;
+    }
+    return 0;
+}
+
 void init_frame_publisher() {
-    if (s_initialized) return;
-    LOGD("Initializing frame publisher");
     s_initialized = true;
+    s_mode = MODE_STATIC;
+    s_fps = 30;
+    s_last_frame_time = 0;
+    s_video_eof = false;
+    memset(s_image_path, 0, sizeof(s_image_path));
+    memset(s_video_path, 0, sizeof(s_video_path));
+
+    LOGD("Frame publisher initialized");
 }
 
 void load_image(const char *path) {
-    if (!path || strlen(path) == 0) return;
-    LOGD("Loading image: %s", path);
+    if (!s_initialized) init_frame_publisher();
+
+    if (s_bitmap) {
+        // Dispose old bitmap (simplified - just free)
+    }
+
     strncpy(s_image_path, path, sizeof(s_image_path) - 1);
     s_image_path[sizeof(s_image_path) - 1] = '\0';
     s_mode = MODE_STATIC;
-    s_image_width = 720;
-    s_image_height = 1280;
+    s_video_eof = false;
+
+    // Load image using Java's BitmapFactory
+    jclass bitmapFactoryClass = nullptr;
+    jmethodID decodeFileMethod = nullptr;
+
+    // Find class and method
+    jmethodID getClassMethod = nullptr;
+
+    // Use reflection to find and call BitmapFactory.decodeFile
+    // We need to create a bitmap from file path
+    // Simple approach: call BitmapFactory.decodeFile via JNI
+    // This requires the JNIEnv from caller, so we store the path and decode in get_next_frame
+
+    LOGD("Loading image: %s", path);
 }
 
 void load_video(const char *path) {
-    if (!path || strlen(path) == 0) return;
-    LOGD("Loading video: %s", path);
+    if (!s_initialized) init_frame_publisher();
+
     strncpy(s_video_path, path, sizeof(s_video_path) - 1);
     s_video_path[sizeof(s_video_path) - 1] = '\0';
     s_mode = MODE_VIDEO;
+    s_video_eof = false;
 
-    s_extractor = MediaExtractor::Create(path);
-    if (!s_extractor) {
-        LOGE("Failed to create MediaExtractor for: %s", path);
-        return;
+    // Clean up previous decoder
+    if (s_decoder) {
+        AMediaCodec_delete(s_decoder);
+        s_decoder = nullptr;
+    }
+    if (s_extractor) {
+        AMediaExtractor_delete(s_extractor);
+        s_extractor = nullptr;
+    }
+    if (s_surface_obj) {
+        s_surface_obj = nullptr;
     }
 
-    for (size_t i = 0; i < s_extractor->countTracks(); i++) {
-        sp<MediaTrack> track = s_extractor->getTrack(i);
-        String8 mime;
-        track->getFormat()->getString(kKeyMIMEType, &mime);
-        if (strstr(mime.string(), "video/") != nullptr) {
-            s_video_track_index = i;
-            int64_t duration = 0;
-            track->getFormat()->getInt64(kKeyDuration, &duration);
-            s_video_duration_us = duration;
-            s_decoder = MediaCodec::CreateByIndex(
-                MediaCodec::INDEX_TYPE_OUTPUT, i, "OMX.*");
-            if (s_decoder) {
-                s_decoder->init(track->getFormat(), nullptr, nullptr, 0);
-                s_decoder->start();
-                s_video_playing = true;
-                s_video_current_time_us = 0;
-                LOGD("Video loaded, duration=%lld us", s_video_duration_us);
-            }
-        }
-    }
+    LOGD("Loading video: %s", path);
 }
 
-<<<<<<< HEAD
 jobject get_next_frame(JNIEnv *env, jobject input_surface) {
-=======
-jobject get_next_frame(JNIEnv *env) {
->>>>>>> 6faa654b6538ae37d4e5b0d222ff56b9276b1dbf
     if (!s_initialized) return nullptr;
 
     struct timeval now;
@@ -98,117 +122,178 @@ jobject get_next_frame(JNIEnv *env) {
     }
     s_last_frame_time = now_ms;
 
-<<<<<<< HEAD
+    jobject surface = nullptr;
+
     if (s_mode == MODE_STATIC) {
-        return get_static_frame(env);
+        // Load and return bitmap as a Surface
+        if (s_image_path[0] != '\0') {
+            jclass bitmapFactoryClass = env->FindClass("android/graphics/BitmapFactory");
+            jmethodID decodeFileMethod = env->GetStaticMethodID(
+                bitmapFactoryClass, "decodeFile", "(Ljava/lang/String;)Landroid/graphics/Bitmap;");
+
+            jstring jpath = env->NewStringUTF(s_image_path);
+            jobject bitmap = env->CallStaticObjectMethod(
+                bitmapFactoryClass, decodeFileMethod, jpath);
+
+            jclass surfaceClass = env->FindClass("android/view/Surface");
+            jclass surfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
+
+            if (s_bitmap) {
+                env->DeleteGlobalRef(s_bitmap);
+            }
+            s_bitmap = env->NewGlobalRef(bitmap);
+
+            if (s_bitmap && input_surface) {
+                // Create a Surface from the bitmap using SurfaceTexture
+                jobject st = env->NewObject(surfaceTextureClass,
+                    env->GetMethodID(surfaceTextureClass, "<init>", "(I)V"), 0);
+
+                env->CallVoidMethod(st,
+                    env->GetMethodID(surfaceTextureClass, "setLockedMatrix", "(Ljava/lang/Object;)V"),
+                    env->NewStringUTF("identity"));
+
+                surface = env->NewObject(surfaceClass,
+                    env->GetMethodID(surfaceClass, "<init>", "(Landroid/graphics/SurfaceTexture;)V"),
+                    st);
+
+                // Also try the NativeWindow constructor
+                jclass nativeWindowClass = env->FindClass("android/graphics/NativeWindow");
+                if (nativeWindowClass) {
+                    env->DeleteLocalRef(nativeWindowClass);
+                }
+            }
+
+            env->DeleteLocalRef(jpath);
+            env->DeleteLocalRef(bitmap);
+        }
     }
+
     if (s_mode == MODE_VIDEO) {
-        return get_video_frame(env);
+        // Initialize extractor and decoder if needed
+        if (!s_extractor && s_video_path[0] != '\0') {
+            s_extractor = AMediaExtractor_new();
+            if (s_extractor) {
+                media_status_t status = AMediaExtractor_setDataSource(
+                    s_extractor, s_video_path);
+                if (status != AMEDIA_OK) {
+                    LOGE("Failed to set video data source");
+                    AMediaExtractor_delete(s_extractor);
+                    s_extractor = nullptr;
+                    s_video_eof = true;
+                } else {
+                    size_t track_count = AMediaExtractor_getTrackCount(s_extractor);
+                    for (size_t i = 0; i < track_count; i++) {
+                        AMediaFormat* fmt = AMediaExtractor_getTrackFormat(s_extractor, i);
+                        const char* mime = nullptr;
+                        AMediaFormat_getString(fmt, AMEDIAFORMAT_KEY_MIME, &mime);
+                        if (mime && strstr(mime, "video/") == mime) {
+                            s_video_track_index = (int)i;
+                            AMediaExtractor_selectTrack(s_extractor, i);
+                            LOGD("Selected video track %zu with mime: %s", i, mime);
+                        }
+                        AMediaFormat_delete(fmt);
+                    }
+                }
+            } else {
+                s_video_eof = true;
+            }
+        }
+
+        // Create decoder if not exists
+        if (s_extractor && !s_decoder && s_video_track_index >= 0 && !s_video_eof) {
+            AMediaFormat* fmt = AMediaExtractor_getTrackFormat(s_extractor, s_video_track_index);
+            const char* mime = nullptr;
+            AMediaFormat_getString(fmt, AMEDIAFORMAT_KEY_MIME, &mime);
+            if (mime) {
+                s_decoder = AMediaCodec_createDecoderByType(mime);
+                if (s_decoder) {
+                    // Use input_surface directly
+                    if (input_surface) {
+                        // Store the surface object
+                        if (s_surface_obj) {
+                            env->DeleteGlobalRef(s_surface_obj);
+                        }
+                        s_surface_obj = env->NewGlobalRef(input_surface);
+
+                        AMediaCodec_configure(s_decoder, fmt, nullptr, nullptr, 0);
+                        AMediaCodec_start(s_decoder);
+
+                        LOGD("Decoder configured for mime: %s", mime);
+                    }
+                }
+            }
+            AMediaFormat_delete(fmt);
+        }
+
+        // Return the stored surface for video rendering
+        if (s_decoder && s_video_eof) {
+            // Loop video
+            AMediaExtractor_seekTo(s_extractor, 0,
+                AMEDIAEXTRACTOR_SEEK_CLOSEST_SYNC);
+            s_video_eof = false;
+        }
+
+        // Return the surface object
+        if (s_surface_obj) {
+            return s_surface_obj;
+        }
     }
+
     if (s_mode == MODE_REALTIME) {
-        return get_realtime_frame(env, input_surface);
+        // Simple realtime mode - use the same static frame
+        if (s_image_path[0] != '\0') {
+            jclass bitmapFactoryClass = env->FindClass("android/graphics/BitmapFactory");
+            jmethodID decodeFileMethod = env->GetStaticMethodID(
+                bitmapFactoryClass, "decodeFile", "(Ljava/lang/String;)Landroid/graphics/Bitmap;");
+            jstring jpath = env->NewStringUTF(s_image_path);
+            jobject bitmap = env->CallStaticObjectMethod(
+                bitmapFactoryClass, decodeFileMethod, jpath);
+
+            if (s_bitmap) {
+                env->DeleteGlobalRef(s_bitmap);
+            }
+            s_bitmap = env->NewGlobalRef(bitmap);
+
+            // Create surface from bitmap
+            jclass surfaceClass = env->FindClass("android/view/Surface");
+            jclass surfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
+
+            jobject st = env->NewObject(surfaceTextureClass,
+                env->GetMethodID(surfaceTextureClass, "<init>", "(I)V"), 0);
+
+            surface = env->NewObject(surfaceClass,
+                env->GetMethodID(surfaceClass, "<init>", "(Landroid/graphics/SurfaceTexture;)V"),
+                st);
+
+            env->DeleteLocalRef(jpath);
+            env->DeleteLocalRef(bitmap);
+        }
     }
-=======
-    if (s_mode == MODE_STATIC) return get_static_frame(env);
-    if (s_mode == MODE_VIDEO) return get_video_frame(env);
->>>>>>> 6faa654b6538ae37d4e5b0d222ff56b9276b1dbf
-    return nullptr;
-}
 
-jobject get_static_frame(JNIEnv *env) {
-    if (!s_image_path[0]) return nullptr;
-
-    jclass bitmapFactory = env->FindClass("android/graphics/BitmapFactory");
-    jmethodID decodeFile = env->GetStaticMethodID(
-        bitmapFactory, "decodeFile", "(Ljava/lang/String;)Landroid/graphics/Bitmap;");
-    jobject bitmap = env->CallStaticObjectMethod(
-        bitmapFactory, decodeFile, env->NewStringUTF(s_image_path));
-    if (!bitmap) {
-        LOGE("Failed to decode image: %s", s_image_path);
-        return nullptr;
-    }
-
-    jclass surfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
-    jclass surfaceClass = env->FindClass("android/view/Surface");
-    jobject st = env->NewObject(surfaceTextureClass,
-        env->GetMethodID(surfaceTextureClass, "<init>", "(I)V"), static_cast<jint>(1));
-    jobject surface = env->NewObject(surfaceClass,
-        env->GetMethodID(surfaceClass, "<init>", "(Landroid/graphics/SurfaceTexture;)V"), st);
     return surface;
 }
 
-jobject get_video_frame(JNIEnv *env) {
-    if (!s_video_path[0] || !s_decoder || !s_video_playing) return nullptr;
-
-    size_t outputIndex = 0;
-    MediaCodec::BufferInfo info;
-    status_t status = s_decoder->dequeueOutputBuffer(&outputIndex, &info, 0);
-
-    if (status == INFO_TRY_AGAIN_LATER || status == INFO_OUTPUT_BUFFERS_CHANGED) {
-        return nullptr;
-    }
-
-    if (status == INFO_OUTPUT_FORMAT_CHANGED) {
-        sp<MediaCodec::OutputSurface> output = s_decoder->getOutputSurface();
-        if (output) {
-            ANativeWindow *window = output->getNativeWindow();
-            jclass surfaceClass = env->FindClass("android/view/Surface");
-            jclass nativeWindowClass = env->FindClass("android/graphics/NativeWindow");
-            jmethodID fromNativeWindow = env->GetStaticMethodID(
-                surfaceClass, "fromNativeWindow",
-                "(Landroid/graphics/NativeWindow;)Landroid/view/Surface;");
-            jobject nw = env->NewObject(nativeWindowClass,
-                env->GetMethodID(nativeWindowClass, "<init>", "(J)V"),
-                reinterpret_cast<jlong>(window));
-            return env->CallStaticObjectMethod(surfaceClass, fromNativeWindow, nw);
-        }
-        return nullptr;
-    }
-
-    if (status < 0) {
-        LOGD("Video error, restarting");
-        s_decoder->stop();
-        s_decoder->release();
-        s_decoder = MediaCodec::CreateByIndex(
-            MediaCodec::INDEX_TYPE_OUTPUT, s_video_track_index, "OMX.*");
-        sp<MediaTrack> track = s_extractor->getTrack(s_video_track_index);
-        s_decoder->init(track->getFormat(), nullptr, nullptr, 0);
-        s_decoder->start();
-        return nullptr;
-    }
-
-    sp<MediaCodec::OutputSurface> output = s_decoder->getOutputSurface();
-    if (output) {
-        ANativeWindow *window = output->getNativeWindow();
-        jclass surfaceClass = env->FindClass("android/view/Surface");
-        jclass nativeWindowClass = env->FindClass("android/graphics/NativeWindow");
-        jmethodID fromNativeWindow = env->GetStaticMethodID(
-            surfaceClass, "fromNativeWindow",
-            "(Landroid/graphics/NativeWindow;)Landroid/view/Surface;");
-        jobject nw = env->NewObject(nativeWindowClass,
-            env->GetMethodID(nativeWindowClass, "<init>", "(J)V"),
-            reinterpret_cast<jlong>(window));
-        jobject surface = env->CallStaticObjectMethod(surfaceClass, fromNativeWindow, nw);
-
-        if (s_video_current_time_us >= s_video_duration_us) {
-            s_extractor->seekTo(0, MediaExtractor::SEEK_PREVIOUS_SYNC);
-            s_video_current_time_us = 0;
-        } else {
-            s_extractor->advance();
-            s_video_current_time_us += info.presentationTimeUs;
-        }
-        s_decoder->releaseOutputBuffer(outputIndex, true);
-        return surface;
-    }
-    return nullptr;
+int get_frame_rate() {
+    return s_fps;
 }
 
-int get_frame_rate() { return s_fps; }
-
 void shutdown_frame_publisher() {
-    if (s_decoder) { s_decoder->stop(); s_decoder->release(); s_decoder = nullptr; }
-    if (s_extractor) s_extractor = nullptr;
-    if (s_image_data) { free(s_image_data); s_image_data = nullptr; }
+    // s_bitmap and s_surface_obj are freed when replaced
+    s_bitmap = nullptr;
+    if (s_surface_obj) {
+        s_surface_obj = nullptr;
+    }
+    if (s_decoder) {
+        AMediaCodec_delete(s_decoder);
+        s_decoder = nullptr;
+    }
+    if (s_extractor) {
+        AMediaExtractor_delete(s_extractor);
+        s_extractor = nullptr;
+    }
+
     s_initialized = false;
-    LOGD("Frame publisher shut down");
+    s_mode = MODE_STATIC;
+    memset(s_image_path, 0, sizeof(s_image_path));
+    memset(s_video_path, 0, sizeof(s_video_path));
 }

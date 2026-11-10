@@ -15,6 +15,8 @@ import com.kycbypasser.app.ui.screen.DashboardScreen
 import com.kycbypasser.app.ui.screen.TargetsScreen
 import com.kycbypasser.app.ui.screen.MediaScreen
 import com.kycbypasser.app.ui.screen.SettingsScreen
+import com.kycbypasser.app.ui.theme.CardBackground
+import com.kycbypasser.app.ui.theme.CyanAccent
 
 /**
  * Main activity with bottom navigation between the four main screens.
@@ -50,8 +52,8 @@ class MainActivity : ComponentActivity() {
                                 )
                             },
                             colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                containerColor = CardBackground,
+                                titleContentColor = CyanAccent
                             )
                         )
                     },
@@ -64,13 +66,13 @@ class MainActivity : ComponentActivity() {
                                 onClick = { currentScreen = Screen.DASHBOARD }
                             )
                             NavigationBarItem(
-                                icon = { Icon(Icons.Default.Devices, "Targets") },
+                                icon = { Icon(Icons.Default.Settings, "Targets") },
                                 label = { Text("Targets") },
                                 selected = currentScreen == Screen.TARGETS,
                                 onClick = { currentScreen = Screen.TARGETS }
                             )
                             NavigationBarItem(
-                                icon = { Icon(Icons.Default.Image, "Media") },
+                                icon = { Icon(Icons.Default.Settings, "Media") },
                                 label = { Text("Media") },
                                 selected = currentScreen == Screen.MEDIA,
                                 onClick = { currentScreen = Screen.MEDIA }

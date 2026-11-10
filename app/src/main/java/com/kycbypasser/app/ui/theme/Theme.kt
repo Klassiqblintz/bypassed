@@ -3,6 +3,7 @@ package com.kycbypasser.app.ui.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -57,7 +58,6 @@ val CustomDarkColorScheme = darkColorScheme(
     onSurface = Color.White,
     error = WarningOrange,
     errorContainer = Color(0xFF4A1C00),
-    success = SuccessGreen,
 )
 
 @Composable

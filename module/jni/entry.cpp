@@ -7,19 +7,22 @@
 #include "camera_hook.h"
 #include "metadata_spoof.h"
 #include "frame_publisher.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "KYC_BYPASS", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "KYC_BYPASS", __VA_ARGS__)
 
 class KycBypassModule : public zygisk::ModuleBase {
 public:
-    void onLoad(Api *api, JNIEnv *env) override {
+    void onLoad(zygisk::Api *api, JNIEnv *env) override {
         this->api = api;
         this->env = env;
         LOGD("KYC Bypasser module loaded");
     }
 
-    void preAppSpecialize(AppSpecializeArgs *args) override {
+    void preAppSpecialize(zygisk::AppSpecializeArgs *args) override {
         const char *process = env->GetStringUTFChars(args->nice_name, nullptr);
 
         if (is_target_app(process)) {
@@ -36,12 +39,12 @@ public:
         api->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
     }
 
-    void postAppSpecialize(const AppSpecializeArgs *args) override {
+    void postAppSpecialize(const zygisk::AppSpecializeArgs *args) override {
         LOGD("Module being unloaded");
     }
 
 private:
-    Api *api;
+    zygisk::Api *api;
     JNIEnv *env;
     bool config_loaded = false;
     Config config;

@@ -1,17 +1,12 @@
 /*
  * Face detector header.
- * Uses OpenCV for face detection and landmark-based warp for real-time face swap.
+ * Simple face detection using Android's built-in FaceDetector (or fallback to center).
  */
 #ifndef KYC_FACE_DETECTOR_H
 #define KYC_FACE_DETECTOR_H
 
 #include <jni.h>
 #include <android/log.h>
-#include <opencv2/opencv.hpp>
-#include <opencv2/face.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/objdetect.hpp>
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "FaceDetector", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "FaceDetector", __VA_ARGS__)
@@ -20,23 +15,19 @@ struct FaceRect {
     float x, y, w, h;
 };
 
-struct Landmarks {
-    float points[10]; // 5 key points: left_eye(2), right_eye(2), nose(2)
-};
-
 /**
- * Initialize the face detector with OpenCV Haar cascade.
+ * Initialize the face detector.
  */
 void init_face_detector();
 
 /**
  * Detect faces in a frame. Returns array of FaceRect via JNI.
+ * Uses Android's FaceDetector API if available, otherwise returns a center-face rect.
  */
 jobjectArray detect_faces(JNIEnv *env, jobject bitmap);
 
 /**
- * Extract 5-point landmarks from detected face region.
- * Returns Landmarks array via JNI.
+ * Extract landmarks from detected face region.
  */
 jobjectArray get_landmarks(JNIEnv *env, jobject bitmap, jobject faceRect);
 

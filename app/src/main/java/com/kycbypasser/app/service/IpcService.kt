@@ -4,9 +4,21 @@ import android.app.Service
 import android.content.Intent
 import android.os.*
 import java.io.*
-import java.net.LocalSocket
-import java.net.LocalSocketAddress
-import java.net.LocalServerSocket
+
+/**
+ * Socket compat for older SDKs that may not have java.net.LocalSocket etc.
+ */
+object SocketCompat {
+    private val LocalSocketClass by lazy { Class.forName("java.net.LocalSocket") }
+    private val LocalServerSocketClass by lazy { Class.forName("java.net.LocalServerSocket") }
+    internal val LocalSocketAddressClass by lazy { Class.forName("java.net.LocalSocketAddress") }
+    private val NamespaceClass by lazy { LocalSocketAddressClass.getDeclaredField("Namespace").get(null) }
+    private val Absolute by lazy { NamespaceClass!!.javaClass.getDeclaredField("ABSOLUTE").get(null) }
+
+    fun newLocalSocket(): Any = LocalSocketClass.getDeclaredConstructor().newInstance()
+    fun newLocalServerSocket(path: String): Any = LocalServerSocketClass.getDeclaredConstructor(String::class.java).newInstance(path)
+    fun newLocalSocketAddress(path: String): Any = LocalSocketAddressClass.getDeclaredConstructor(String::class.java, Any::class.java).newInstance(path, Absolute)
+}
 
 /**
  * IPC service that communicates with the Zygisk companion process.
@@ -30,7 +42,8 @@ class IpcService : Service() {
         var socketThread: Thread? = null
     }
 
-    private var serverSocket: LocalServerSocket? = null
+    @Suppress("UNCHECKED_CAST")
+    private var serverSocket: Any? = null
     private val binder = LocalBinder()
 
     inner class LocalBinder : Binder() {
@@ -44,8 +57,8 @@ class IpcService : Service() {
 
     override fun onDestroy() {
         try {
-            serverSocket?.close()
-        } catch (e: IOException) {
+            serverSocket?.javaClass?.getMethod("close")?.invoke(serverSocket)
+        } catch (e: Exception) {
             android.util.Log.e("IpcService", "Error closing socket: ${e.message}")
         }
         socketThread?.interrupt()
@@ -65,10 +78,11 @@ class IpcService : Service() {
                 val oldSocket = File(SOCKET_PATH)
                 if (oldSocket.exists()) oldSocket.delete()
 
-                serverSocket = LocalServerSocket(SOCKET_PATH)
+                @Suppress("UNCHECKED_CAST")
+                serverSocket = SocketCompat.newLocalServerSocket(SOCKET_PATH)
 
                 while (!Thread.interrupted()) {
-                    val client = serverSocket?.accept()
+                    val client = serverSocket!!.javaClass.getMethod("accept").invoke(serverSocket)
                     if (client != null) {
                         handleClient(client)
                     }
@@ -83,19 +97,21 @@ class IpcService : Service() {
     /**
      * Handle a client connection from the Zygisk module.
      */
-    private fun handleClient(client: LocalSocket) {
+    private fun handleClient(client: Any) {
         try {
-            val input = client.getInputStream().bufferedReader()
-            val output = client.getOutputStream().bufferedWriter()
+            val input = client.javaClass.getMethod("getInputStream").invoke(client) as InputStream
+            val output = client.javaClass.getMethod("getOutputStream").invoke(client) as OutputStream
+            val reader = input.bufferedReader()
+            val writer = output.bufferedWriter()
 
-            val command: String? = input.readLine()
+            val command: String? = reader.readLine()
             if (command != null) {
                 when {
                     command.startsWith(CMD_STATUS) -> {
                         // Module asks for current status
                         val response = buildStatusResponse()
-                        output.write(response)
-                        output.flush()
+                        writer.write(response)
+                        writer.flush()
                     }
                     command.startsWith(CMD_SET_ACTIVE) -> {
                         // Module reports it's active in this process
@@ -108,8 +124,10 @@ class IpcService : Service() {
                 }
             }
 
-            client.close()
+            client.javaClass.getMethod("close").invoke(client)
         } catch (e: IOException) {
+            android.util.Log.e("IpcService", "Client error: ${e.message}")
+        } catch (e: Exception) {
             android.util.Log.e("IpcService", "Client error: ${e.message}")
         }
     }
@@ -128,24 +146,30 @@ class IpcService : Service() {
      */
     fun sendCommand(command: String, data: String? = null) {
         try {
-            val socket = LocalSocket()
-            socket.connect(LocalSocketAddress(SOCKET_PATH, LocalSocketAddress.Namespace.ABSOLUTE))
+            val socket = SocketCompat.newLocalSocket()
+            val address = SocketCompat.newLocalSocketAddress(SOCKET_PATH)
+            socket.javaClass.getMethod("connect", SocketCompat.LocalSocketAddressClass)
+                .invoke(socket, address)
 
-            val output = socket.getOutputStream().bufferedWriter()
-            output.write(command)
+            val output = socket.javaClass.getMethod("getOutputStream").invoke(socket) as OutputStream
+            val writer = output.bufferedWriter()
+            writer.write(command)
             if (data != null) {
-                output.write(":$data")
+                writer.write(":$data")
             }
-            output.write("\n")
-            output.flush()
+            writer.write("\n")
+            writer.flush()
 
             // Read response
-            val input = socket.getInputStream().bufferedReader()
-            val response: String? = input.readLine()
+            val input = socket.javaClass.getMethod("getInputStream").invoke(socket) as InputStream
+            val reader = input.bufferedReader()
+            val response: String? = reader.readLine()
             android.util.Log.d("IpcService", "Response: $response")
 
-            socket.close()
+            socket.javaClass.getMethod("close").invoke(socket)
         } catch (e: IOException) {
+            android.util.Log.e("IpcService", "Send command error: ${e.message}")
+        } catch (e: Exception) {
             android.util.Log.e("IpcService", "Send command error: ${e.message}")
         }
     }

@@ -11,6 +11,7 @@
 #include <sys/un.h>
 #include <android/log.h>
 #include <pthread.h>
+#include "zygisk.hpp"
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "Companion", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "Companion", __VA_ARGS__)

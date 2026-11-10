@@ -53,5 +53,6 @@ extern orig_camera1_setPreviewSurface_t orig_camera1_setPreviewSurface;
 void register_camera_hooks(void *api, JNIEnv *env);
 void register_plt_hooks(void *api, void *env);
 jobject create_virtual_surface(JNIEnv *env);
+jint hook_camera2_get_int(JNIEnv *env, jobject thiz, jobject key);
 
 #endif // KYC_CAMERA_HOOK_H

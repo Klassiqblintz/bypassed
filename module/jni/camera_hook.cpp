@@ -5,17 +5,18 @@
 #include "camera_hook.h"
 #include "frame_publisher.h"
 #include "metadata_spoof.h"
+#include "zygisk.hpp"
 
 Config g_config;
 bool g_config_loaded = false;
 const char *VIRTUAL_CAMERA_ID = "100";
 
-static orig_openCamera_t orig_openCamera = nullptr;
-static orig_get_int_t orig_get_int = nullptr;
-static orig_createCaptureSession_t orig_createCaptureSession = nullptr;
-static orig_acquireNextImage_t orig_acquireNextImage = nullptr;
-static orig_camera1_open_t orig_camera1_open = nullptr;
-static orig_camera1_setPreviewSurface_t orig_camera1_setPreviewSurface = nullptr;
+orig_openCamera_t orig_openCamera = nullptr;
+orig_get_int_t orig_get_int = nullptr;
+orig_createCaptureSession_t orig_createCaptureSession = nullptr;
+orig_acquireNextImage_t orig_acquireNextImage = nullptr;
+orig_camera1_open_t orig_camera1_open = nullptr;
+orig_camera1_setPreviewSurface_t orig_camera1_setPreviewSurface = nullptr;
 
 /* HOOK 1: Camera2 - CameraManager.openCamera() */
 void hook_camera2_openCamera(JNIEnv *env, jobject thiz, jstring cameraId, jobject callback, jobject handler) {
@@ -29,10 +30,9 @@ void hook_camera2_openCamera(JNIEnv *env, jobject thiz, jstring cameraId, jobjec
 }
 
 /* HOOK 2: Camera2 - CameraCharacteristics.getInt() */
-void hook_camera2_get_int(JNIEnv *env, jobject thiz, jobject key) {
+jint hook_camera2_get_int(JNIEnv *env, jobject thiz, jobject key) {
     if (!g_config.active) {
-        if (orig_get_int) orig_get_int(env, thiz, key);
-        return;
+        return orig_get_int ? orig_get_int(env, thiz, key) : 0;
     }
 
     jclass keyClass = env->FindClass("android/hardware/camera2/CameraCharacteristics");
@@ -41,12 +41,19 @@ void hook_camera2_get_int(JNIEnv *env, jobject thiz, jobject key) {
     const char *keyStr = env->GetStringUTFChars(keyName, nullptr);
 
     if (strcmp(keyStr, "CameraCharacteristics.LENS_FOCAL_LENGTH") == 0) {
-        jfloat val = 4.3f;
-        jclass floatClass = env->FindClass("java/lang/Float");
-        jobject floatObj = env->NewObject(floatClass,
-            env->GetMethodID(floatClass, "<init>", "(F)V"), val);
         env->ReleaseStringUTFChars(keyName, keyStr);
-        return;
+        env->DeleteLocalRef(keyName);
+        return 4; // 4.3f rounded to int
+    }
+    if (strcmp(keyStr, "CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL") == 0) {
+        env->ReleaseStringUTFChars(keyName, keyStr);
+        env->DeleteLocalRef(keyName);
+        return 3; // FULL
+    }
+    if (strcmp(keyStr, "CameraCharacteristics.FLASH_INFO_AVAILABLE") == 0) {
+        env->ReleaseStringUTFChars(keyName, keyStr);
+        env->DeleteLocalRef(keyName);
+        return 0;
     }
 
     jint result = orig_get_int ? orig_get_int(env, thiz, key) : 0;
@@ -79,7 +86,7 @@ jobject hook_imageReader_acquireNextImage(JNIEnv *env, jobject thiz) {
         if (orig_acquireNextImage) return orig_acquireNextImage(env, thiz);
         return nullptr;
     }
-    jobject frame = get_next_frame(env);
+    jobject frame = get_next_frame(env, nullptr);
     if (frame) return frame;
     if (orig_acquireNextImage) return orig_acquireNextImage(env, thiz);
     return nullptr;
@@ -170,7 +177,7 @@ void register_plt_hooks(void *api_ptr, JNIEnv *env) {
 jobject create_virtual_surface(JNIEnv *env) {
     jclass surfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
     jclass surfaceClass = env->FindClass("android/view/Surface");
-    GLuint texId = 1;
+    unsigned int texId = 1;
     jobject st = env->NewObject(surfaceTextureClass,
         env->GetMethodID(surfaceTextureClass, "<init>", "(I)V"),
         static_cast<jint>(texId));

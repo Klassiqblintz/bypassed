@@ -5,11 +5,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
@@ -28,14 +31,10 @@ fun TargetsScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedPackages by remember { mutableStateOf<Set<String>>(emptySet()) }
 
-    // Get all installed apps that have camera permission
+    // Get all installed apps that have at least one activity
     val allApps = remember {
-        packageManager.getInstalledPackages(PackageManager.GET_PERMISSIONS)
-            .filter { pkg ->
-                val hasCamera = pkg.requestedPermissions?.any { it == "android.permission.CAMERA" } == true
-                val hasActivity = pkg.activities?.isNotEmpty() == true
-                hasCamera && hasActivity
-            }
+        packageManager.getInstalledPackages(PackageManager.GET_ACTIVITIES)
+            .filter { pkg -> pkg.activities?.isNotEmpty() == true }
             .map { pkg ->
                 AppInfo(
                     packageName = pkg.packageName,
@@ -95,7 +94,7 @@ fun TargetsScreen(
             ) {
                 Text(
                     text = if (searchQuery.isNotEmpty()) "No apps match your search"
-                          else "No camera apps found",
+                          else "No apps found",
                     color = Color.Gray
                 )
             }
@@ -130,7 +129,7 @@ fun TargetsScreen(
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             ) {
-                Icon(Icons.Default.Save, null)
+                Icon(Icons.Default.Settings, null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("SAVE TARGETS")
             }
@@ -156,22 +155,47 @@ fun AppItem(
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // App icon placeholder (would use actual icon in real impl)
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .background(
-                    if (isSelected) Color(0xFF1B5E20) else CardBackground,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = app.appName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                fontSize = 16.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                color = Color.White
+        // Display actual app icon
+        if (app.icon != null) {
+            val bitmap = remember(app.icon) {
+                (app.icon as? android.graphics.drawable.BitmapDrawable)?.let { it.bitmap }
+                    ?: run {
+                        val drawable = app.icon
+                        val bitmap = android.graphics.Bitmap.createBitmap(
+                            drawable.intrinsicWidth.takeIf { it > 0 } ?: 48,
+                            drawable.intrinsicHeight.takeIf { it > 0 } ?: 48,
+                            android.graphics.Bitmap.Config.ARGB_8888
+                        )
+                        val canvas = android.graphics.Canvas(bitmap)
+                        drawable.setBounds(0, 0, canvas.width, canvas.height)
+                        drawable.draw(canvas)
+                        bitmap
+                    }
+            }
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = app.appName,
+                modifier = Modifier.size(36.dp),
+                contentScale = ContentScale.Crop
             )
+        } else {
+            // Fallback if icon is null (very rare)
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(
+                        if (isSelected) Color(0xFF1B5E20) else CardBackground,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = app.appName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                    fontSize = 16.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = Color.White
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -190,7 +214,7 @@ fun AppItem(
             )
         }
 
-            Switch(
+        Switch(
             checked = isSelected,
             onCheckedChange = { onToggle() }
         )
@@ -204,5 +228,4 @@ fun saveTargets(packages: Set<String>) {
     val targetsPath = com.kycbypasser.app.KYCApp.targetsPath()
     val content = packages.joinToString("\n")
     android.util.Log.d("Targets", "Saving targets: $content")
-    // In real impl: write to file via File API or IPC to companion process
 }

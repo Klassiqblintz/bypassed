@@ -13,6 +13,7 @@ set(SOURCES
     frame_publisher.cpp
     metadata_spoof.cpp
     companion.cpp
+    face_detector.cpp
 )
 
 add_library(kyc_bypasser SHARED ${SOURCES})
@@ -23,11 +24,8 @@ target_link_libraries(
     log
     jnigraphics
     media
-    gui
-    graphics
-    ui
-    binder
-    utils
+    OpenMAXAL
+    OpenSLES
 )
 
 target_compile_options(kyc_bypasser PRIVATE

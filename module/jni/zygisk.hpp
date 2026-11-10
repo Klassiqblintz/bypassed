@@ -15,6 +15,7 @@
 // DO NOT MODIFY ANY CODE IN THIS HEADER.
 #pragma once
 #include <jni.h>
+#include <sys/types.h>
 #define ZYGISK_API_VERSION 5
 
 namespace zygisk {

@@ -8,7 +8,7 @@
 #include <jni.h>
 
 void register_metadata_hooks(void *api_ptr, JNIEnv *env);
-int get_spoofed_int(jobject key);
-jfloatArray get_spoofed_float(jobject key);
+int get_spoofed_int(JNIEnv *env, jobject key);
+jfloatArray get_spoofed_float(JNIEnv *env, jobject key);
 
 #endif // KYC_METADATA_SPOOF_H

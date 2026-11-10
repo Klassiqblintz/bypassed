@@ -150,7 +150,7 @@ fun MediaScreen() {
                         onClick = { imageLauncher.launch("image/*") },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Image, null)
+                        Icon(Icons.Default.Settings, null)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("CHOOSE IMAGE")
                     }
@@ -234,7 +234,7 @@ fun MediaScreen() {
                         onClick = { videoLauncher.launch("video/*") },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.VideoLibrary, null)
+                        Icon(Icons.Default.PlayArrow, null)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("CHOOSE VIDEO")
                     }
@@ -261,7 +261,7 @@ fun MediaScreen() {
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             ) {
-                Icon(Icons.Default.Save, null)
+                Icon(Icons.Default.Settings, null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("SAVE MEDIA")
             }
