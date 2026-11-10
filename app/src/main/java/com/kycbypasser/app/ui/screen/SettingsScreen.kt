@@ -1,5 +1,6 @@
 package com.kycbypasser.app.ui.screen
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -12,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import com.kycbypasser.app.ui.theme.CardBackground
 
 /**
  * Settings screen - configure injection behavior.

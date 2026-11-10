@@ -2,6 +2,7 @@ package com.kycbypasser.app
 
 import android.app.Application
 import android.content.Context
+import java.io.File
 
 /**
  * Main application class.
@@ -36,13 +37,13 @@ class KYCApp : Application() {
      * This runs when the app first launches.
      */
     private fun ensureModuleDir() {
-        val dir = android.os.File(MODULE_DIR)
+        val dir = File(MODULE_DIR)
         if (!dir.exists()) {
             dir.mkdirs()
         }
 
         // Create default config if it doesn't exist
-        val configFile = android.os.File(CONFIG_FILE)
+        val configFile = File(CONFIG_FILE)
         if (!configFile.exists()) {
             val defaultConfig = """
                 {
@@ -59,7 +60,7 @@ class KYCApp : Application() {
         }
 
         // Create default targets file if it doesn't exist
-        val targetsFile = android.os.File(TARGETS_FILE)
+        val targetsFile = File(TARGETS_FILE)
         if (!targetsFile.exists()) {
             targetsFile.writeText("")
         }

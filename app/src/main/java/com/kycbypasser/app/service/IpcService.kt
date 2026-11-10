@@ -4,6 +4,9 @@ import android.app.Service
 import android.content.Intent
 import android.os.*
 import java.io.*
+import java.net.LocalSocket
+import java.net.LocalSocketAddress
+import java.net.LocalServerSocket
 
 /**
  * IPC service that communicates with the Zygisk companion process.
@@ -40,7 +43,11 @@ class IpcService : Service() {
     }
 
     override fun onDestroy() {
-        serverSocket?.close()
+        try {
+            serverSocket?.close()
+        } catch (e: IOException) {
+            android.util.Log.e("IpcService", "Error closing socket: ${e.message}")
+        }
         socketThread?.interrupt()
         super.onDestroy()
     }
@@ -78,10 +85,10 @@ class IpcService : Service() {
      */
     private fun handleClient(client: LocalSocket) {
         try {
-            val input = client.inputStream.bufferedReader()
-            val output = client.outputStream.bufferedWriter()
+            val input = client.getInputStream().bufferedReader()
+            val output = client.getOutputStream().bufferedWriter()
 
-            val command = input.readLine()
+            val command: String? = input.readLine()
             if (command != null) {
                 when {
                     command.startsWith(CMD_STATUS) -> {
@@ -124,8 +131,8 @@ class IpcService : Service() {
             val socket = LocalSocket()
             socket.connect(LocalSocketAddress(SOCKET_PATH, LocalSocketAddress.Namespace.ABSOLUTE))
 
-            val output = socket.outputStream.bufferedWriter()
-            output.write("$command")
+            val output = socket.getOutputStream().bufferedWriter()
+            output.write(command)
             if (data != null) {
                 output.write(":$data")
             }
@@ -133,8 +140,8 @@ class IpcService : Service() {
             output.flush()
 
             // Read response
-            val input = socket.inputStream.bufferedReader()
-            val response = input.readLine()
+            val input = socket.getInputStream().bufferedReader()
+            val response: String? = input.readLine()
             android.util.Log.d("IpcService", "Response: $response")
 
             socket.close()

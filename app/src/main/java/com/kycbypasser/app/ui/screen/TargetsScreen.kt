@@ -1,6 +1,7 @@
 package com.kycbypasser.app.ui.screen
 
 import android.content.pm.PackageManager
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import com.kycbypasser.app.ui.theme.CardBackground
 
 /**
  * Targets screen - select which apps to inject into.
