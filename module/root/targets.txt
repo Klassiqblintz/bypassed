@@ -1,0 +1,4 @@
+com.example.kycapp
+com.bank.app
+com.finance.kyc
+# Add more target packages below
