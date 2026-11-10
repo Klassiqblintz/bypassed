@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         // Create shared state that persists across all screens
-        val state = remember { KycState(this) }
+        val state = KycState(this)
 
         setContent {
             var currentScreen by remember { mutableStateOf(Screen.DASHBOARD) }
@@ -70,13 +70,13 @@ class MainActivity : ComponentActivity() {
                                 onClick = { currentScreen = Screen.DASHBOARD }
                             )
                             NavigationBarItem(
-                                icon = { Icon(Icons.Default.People, "Targets") },
+                                icon = { Icon(Icons.Default.List, "Targets") },
                                 label = { Text("Targets") },
                                 selected = currentScreen == Screen.TARGETS,
                                 onClick = { currentScreen = Screen.TARGETS }
                             )
                             NavigationBarItem(
-                                icon = { Icon(Icons.Default.CameraAlt, "Media") },
+                                icon = { Icon(Icons.Default.PhotoCamera, "Media") },
                                 label = { Text("Media") },
                                 selected = currentScreen == Screen.MEDIA,
                                 onClick = { currentScreen = Screen.MEDIA }

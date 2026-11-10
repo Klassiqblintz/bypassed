@@ -127,9 +127,7 @@ fun SettingsScreen(
                 ) {
                     FilterChip(
                         selected = livenessMode == "static",
-                        onClick = {
-                            livenessMode = "static"
-                        },
+                        onClick = { livenessMode = "static" },
                         label = { Text("Static Image") },
                         leadingIcon = {
                             if (livenessMode == "static") Icon(Icons.Default.Check, null)
@@ -137,9 +135,7 @@ fun SettingsScreen(
                     )
                     FilterChip(
                         selected = livenessMode == "video",
-                        onClick = {
-                            livenessMode = "video"
-                        },
+                        onClick = { livenessMode = "video" },
                         label = { Text("Video Loop") },
                         leadingIcon = {
                             if (livenessMode == "video") Icon(Icons.Default.Check, null)
@@ -160,7 +156,7 @@ fun SettingsScreen(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Check, null)
+                    Icon(Icons.Default.Settings, null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("SAVE SETTINGS")
                 }
@@ -184,7 +180,7 @@ fun SettingsScreen(
                 Text(
                     text = "KYC Bypasser works with or without root.\n" +
                            "With root (Zygisk): deep camera hooking\n" +
-                           "Without root: overlay mode\n\n" +
+                           "Without root: virtual camera service\n\n" +
                            "No data wipe required for root installation.",
                     fontSize = 12.sp,
                     color = Color.White.copy(alpha = 0.8f)

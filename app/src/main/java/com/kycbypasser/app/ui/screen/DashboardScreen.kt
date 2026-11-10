@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import com.kycbypasser.app.KycState
+import com.kycbypasser.app.service.VirtualCameraService
 import com.kycbypasser.app.ui.theme.CyanAccent
 import com.kycbypasser.app.ui.theme.CardBackground
 import com.kycbypasser.app.ui.theme.SuccessGreen
@@ -78,18 +79,14 @@ fun DashboardScreen(
                 Button(
                     onClick = {
                         state.toggleActive()
+                        val intent = android.content.Intent(state.appContext, VirtualCameraService::class.java)
                         if (state.isActive) {
-                            // Start virtual camera service
-                            val intent = android.content.Intent(state.context, com.kycbypasser.app.service.VirtualCameraService::class.java)
-                            android.content.ContextCompat.startForegroundService(state.context, intent)
-                            android.util.Log.d("Dashboard", "Virtual camera started")
+                            intent.action = VirtualCameraService.CMD_START
                         } else {
-                            // Stop virtual camera service
-                            val intent = android.content.Intent(state.context, com.kycbypasser.app.service.VirtualCameraService::class.java)
-                            intent.action = com.kycbypasser.app.service.VirtualCameraService.CMD_STOP
-                            state.context.startService(intent)
-                            android.util.Log.d("Dashboard", "Virtual camera stopped")
+                            intent.action = VirtualCameraService.CMD_STOP
                         }
+                        state.startService(intent)
+                        android.util.Log.d("Dashboard", "Virtual camera ${if (state.isActive) "started" else "stopped"}")
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -114,7 +111,7 @@ fun DashboardScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             StatCard(
-                icon = Icons.Default.People,
+                icon = Icons.Default.List,
                 title = "Targets",
                 value = state.selectedTargetPackages.size.toString(),
                 modifier = Modifier.weight(1f)
@@ -167,7 +164,7 @@ fun DashboardScreen(
                         .fillMaxWidth()
                         .padding(bottom = 8.dp)
                 ) {
-                    Icon(Icons.Default.People, null)
+                    Icon(Icons.Default.List, null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("MANAGE TARGETS")
                 }
@@ -176,7 +173,7 @@ fun DashboardScreen(
                     onClick = { /* Navigation handled by parent */ },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.CameraAlt, null)
+                    Icon(Icons.Default.PhotoCamera, null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("MANAGE MEDIA")
                 }

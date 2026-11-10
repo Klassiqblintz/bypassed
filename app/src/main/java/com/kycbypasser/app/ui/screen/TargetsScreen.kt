@@ -136,7 +136,7 @@ fun TargetsScreen(
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             ) {
-                Icon(Icons.Default.People, null)
+                Icon(Icons.Default.List, null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("SAVE TARGETS")
             }

@@ -17,7 +17,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.kycbypasser.app.KycState
 import com.kycbypasser.app.ui.theme.CardBackground
-import java.io.File
 
 /**
  * Media screen - select images and videos for injection.
@@ -296,7 +295,7 @@ fun MediaScreen(
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             ) {
-                Icon(Icons.Default.CameraAlt, null)
+                Icon(Icons.Default.PhotoCamera, null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("SAVE MEDIA")
             }

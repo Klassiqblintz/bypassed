@@ -1,17 +1,18 @@
 package com.kycbypasser.app
 
-import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import java.io.File
 
 /**
  * Shared state holder for all screens.
  * Persists selections across navigation and writes to config files.
  */
-class KycState(private val context: android.content.Context) {
-    val context get() = context
+class KycState(
+    val appContext: android.content.Context
+) {
 
     // --- State ---
     var isActive by mutableStateOf(false)
@@ -35,17 +36,15 @@ class KycState(private val context: android.content.Context) {
     // --- Load state from files ---
     private fun loadState() {
         try {
-            val config = android.os.FileUtils.readFileToByteArray(
-                java.io.File(configPath)
-            )?.decodeToString()
+            val config = File(configPath).readText()
             if (!config.isNullOrEmpty()) {
                 isActive = parseConfigBool(config, "active", false)
-                injectionMode = parseConfigString(config, "mode", "static")
-                selectedImagePath = parseConfigString(config, "image_path", null)
-                selectedVideoPath = parseConfigString(config, "video_path", null)
+                injectionMode = parseConfigString(config, "mode") ?: "static"
+                selectedImagePath = parseConfigString(config, "image_path")
+                selectedVideoPath = parseConfigString(config, "video_path")
             }
 
-            val targets = java.io.File(targetsPath).readText().trim()
+            val targets = File(targetsPath).readText().trim()
             if (targets.isNotEmpty()) {
                 selectedTargetPackages = targets.split("\n").filter { it.isNotBlank() }.toSet()
             }
@@ -65,7 +64,7 @@ class KycState(private val context: android.content.Context) {
     // --- Save config.json ---
     fun saveConfig() {
         try {
-            val cfg = java.io.File(configPath)
+            val cfg = File(configPath)
             cfg.parentFile?.mkdirs()
             cfg.writeText(
                 """{
@@ -87,7 +86,7 @@ class KycState(private val context: android.content.Context) {
     // --- Save targets.txt ---
     fun saveTargets() {
         try {
-            val tgt = java.io.File(targetsPath)
+            val tgt = File(targetsPath)
             tgt.parentFile?.mkdirs()
             tgt.writeText(selectedTargetPackages.joinToString("\n"))
             Log.d("KycState", "Targets saved: ${selectedTargetPackages.size} packages")
@@ -115,6 +114,11 @@ class KycState(private val context: android.content.Context) {
         injectionMode = mode
     }
 
+    // --- Context for starting services ---
+    fun startService(intent: android.content.Intent) {
+        appContext.startService(intent)
+    }
+
     // --- Parse helpers ---
     private fun parseConfigBool(config: String, key: String, default: Boolean): Boolean {
         val pattern = "\"$key\"\\s*:\\s*(true|false)"
@@ -122,9 +126,9 @@ class KycState(private val context: android.content.Context) {
         return match?.groupValues?.get(1) == "true"
     }
 
-    private fun parseConfigString(config: String, key: String, default: String?): String? {
+    private fun parseConfigString(config: String, key: String): String? {
         val pattern = "\"$key\"\\s*:\\s*\"([^\"]*)\""
         val match = Regex(pattern).find(config)
-        return match?.groupValues?.get(1)?.takeIf { it.isNotEmpty() } ?: default
+        return match?.groupValues?.get(1)?.takeIf { it.isNotEmpty() }
     }
 }
