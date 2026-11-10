@@ -2,53 +2,54 @@ package com.kycbypasser.app.service
 
 import android.app.Notification
 import android.app.NotificationManager
-import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.media.MediaCodec
-import android.media.MediaCodecInfo
-import android.media.MediaExtractor
-import android.media.MediaFormat
+import android.graphics.BitmapFactory
+import android.graphics.Rect
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraDevice
+import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CameraCaptureSession
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import android.view.Surface
+import android.view.SurfaceTexture
 import com.kycbypasser.app.KycState
 import com.kycbypasser.app.MainActivity
-import java.io.File
 
 /**
- * Virtual camera service — streams injected media to a surface
- * that the target app reads as its camera output.
+ * Virtual camera service — opens the device's front camera,
+ * each frame draws our selected image/video onto it,
+ * so the target app sees our frames instead of the real camera.
  *
- * Works WITHOUT root. Uses a background thread to continuously
- * render the selected image or video to a SurfaceTexture/Surface pair.
+ * Works WITHOUT root. Uses Camera2 API.
  */
 class VirtualCameraService : Service() {
 
     companion object {
-        const val VIRTUAL_CAMERA_ID = "100"
         const val CHANNEL_ID = "kyc_bypasser_vc"
         const val NOTIFICATION_ID = 1
         const val CMD_START = "START"
         const val CMD_STOP = "STOP"
-        const val SURFACE_PATH = "/data/local/tmp/kyc_bypasser_surface"
         const val LOG_TAG = "VirtualCamera"
         const val DEFAULT_FPS = 30
         const val FRAME_DURATION_MS = 1000L / DEFAULT_FPS
     }
 
-    private var surfaceTexture: android.graphics.SurfaceTexture? = null
-    private var surface: android.view.Surface? = null
-    private var isRunning = false
-    private var renderThread: Thread? = null
-
-    // Media state
+    private var cameraDevice: CameraDevice? = null
+    private var cameraSession: CameraCaptureSession? = null
+    private var surfaceTexture: SurfaceTexture? = null
+    private var surface: Surface? = null
     private var currentImage: Bitmap? = null
     private var currentVideoPath: String? = null
     private var currentMode: String = "static"
+    private var isRunning = false
+    private var renderThread: Thread? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
@@ -57,185 +58,163 @@ class VirtualCameraService : Service() {
         isRunning = true
 
         // Load configuration
+        loadConfig()
+
+        // Open the front camera
+        openCamera()
+
+        // Create surface for drawing our frames
+        createSurface()
+
+        // Start rendering (each frame draws our image/video)
+        startRendering()
+    }
+
+    private fun loadConfig() {
         try {
             val state = KycState(this)
             currentMode = state.injectionMode
             currentImage = if (!state.selectedImagePath.isNullOrEmpty()) {
-                android.graphics.BitmapFactory.decodeFile(state.selectedImagePath)
+                BitmapFactory.decodeFile(state.selectedImagePath)
             } else {
                 // Placeholder white bitmap
                 Bitmap.createBitmap(720, 1280, Bitmap.Config.ARGB_8888)
             }
             currentVideoPath = state.selectedVideoPath
+
+            if (currentImage == null || currentImage!!.width == 0) {
+                currentImage = Bitmap.createBitmap(720, 1280, Bitmap.Config.ARGB_8888)
+            }
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to load config: ${e.message}")
         }
-
-        // Create a placeholder image if none exists
-        if (currentImage == null || currentImage!!.width == 0) {
-            currentImage = Bitmap.createBitmap(720, 1280, Bitmap.Config.ARGB_8888)
-        }
-
-        // Setup virtual camera surface
-        setupSurface()
-
-        // Start rendering based on mode
-        when (currentMode) {
-            "video" -> startVideoRenderer()
-            else -> startImageRenderer()
-        }
-
-        // Write surface path to file for Zygisk hook
-        writeSurfacePath()
     }
 
-    /**
-     * Create a SurfaceTexture + Surface pair.
-     * The Surface will be used by the target app's camera as output.
-     */
-    private fun setupSurface() {
+    private fun openCamera() {
         try {
-            surfaceTexture = android.graphics.SurfaceTexture(1)
-            surfaceTexture?.setDefaultBufferSize(720, 1280)
-            surface = android.view.Surface(surfaceTexture)
-            surfaceTexture?.setOnFrameAvailableListener {
-                // Frame is available, can process if needed
+            val cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            var frontCameraId: String? = null
+
+            for (cameraId in cameraManager.cameraIdList) {
+                val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+                val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
+                if (facing == CameraCharacteristics.LENS_FACING_FRONT) {
+                    frontCameraId = cameraId
+                    break
+                }
             }
-            Log.d(LOG_TAG, "Surface created successfully")
+
+            if (frontCameraId == null) {
+                Log.e(LOG_TAG, "No front camera found")
+                return
+            }
+
+            Log.d(LOG_TAG, "Opening front camera: $frontCameraId")
+            cameraManager.openCamera(frontCameraId, stateCallback, mainHandler)
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Failed to open camera: ${e.message}", e)
+        }
+    }
+
+    private val stateCallback = object : CameraDevice.StateCallback() {
+        override fun onOpened(device: CameraDevice) {
+            cameraDevice = device
+            Log.d(LOG_TAG, "Camera opened successfully")
+            createCaptureSession()
+        }
+
+        override fun onDisconnected(device: CameraDevice) {
+            Log.d(LOG_TAG, "Camera disconnected")
+            cameraDevice = null
+        }
+
+        override fun onError(device: CameraDevice, error: Int) {
+            Log.e(LOG_TAG, "Camera error: $error")
+        }
+    }
+
+    private fun createSurface() {
+        try {
+            surfaceTexture = SurfaceTexture(1)
+            surfaceTexture?.setDefaultBufferSize(720, 1280)
+            surface = Surface(surfaceTexture)
+            Log.d(LOG_TAG, "Surface created: ${surfaceTexture?.getTextureId()}")
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to create surface: ${e.message}", e)
         }
     }
 
-    /**
-     * Start image renderer — continuously draws the selected image to the surface.
-     */
-    private fun startImageRenderer() {
-        Log.d(LOG_TAG, "Starting image renderer")
-        val img = currentImage ?: return
-
-        renderThread = Thread {
-            while (isRunning && surface != null) {
-                try {
-                    val canvas = surface?.lockCanvas(null)
-                    if (canvas != null) {
-                        val src = android.graphics.Rect(0, 0, img.width, img.height)
-                        val dst = android.graphics.Rect(0, 0, canvas.width, canvas.height)
-                        canvas.drawBitmap(img, src, dst, null)
-                        surface?.unlockCanvasAndPost(canvas)
-                    }
-                    Thread.sleep(FRAME_DURATION_MS)
-                } catch (e: Exception) {
-                    Log.e(LOG_TAG, "Image render error: ${e.message}", e)
-                }
-            }
+    private fun createCaptureSession() {
+        val surf = surface ?: run {
+            Log.e(LOG_TAG, "No surface available")
+            return
         }
-        renderThread?.start()
-    }
-
-    /**
-     * Start video renderer — uses MediaExtractor + MediaCodec to decode and push frames.
-     */
-    private fun startVideoRenderer() {
-        Log.d(LOG_TAG, "Starting video renderer")
-        val videoPath = currentVideoPath ?: run {
-            Log.w(LOG_TAG, "No video path, falling back to image renderer")
-            startImageRenderer()
+        val cam = cameraDevice ?: run {
+            Log.e(LOG_TAG, "No camera device available")
             return
         }
 
+        cam.createCaptureSession(
+            listOf(surf),
+            object : CameraCaptureSession.StateCallback() {
+                override fun onConfigured(session: CameraCaptureSession) {
+                    cameraSession = session
+                    try {
+                        val request = cam.createCaptureRequest(
+                            CameraDevice.TEMPLATE_PREVIEW
+                        )
+                        request.addTarget(surf)
+                        session.setRepeatingRequest(
+                            request.build(),
+                            null,
+                            mainHandler
+                        )
+                        Log.d(LOG_TAG, "Camera session configured with our Surface")
+                    } catch (e: Exception) {
+                        Log.e(LOG_TAG, "Failed to create request: ${e.message}", e)
+                    }
+                }
+
+                override fun onConfigureFailed(session: CameraCaptureSession) {
+                    Log.e(LOG_TAG, "Failed to configure camera session")
+                }
+            },
+            mainHandler
+        )
+    }
+
+    /**
+     * Each frame, draw our image/video to the Surface.
+     * Since the camera outputs to this same Surface, our drawing
+     * overrides the camera's sensor data — the target app sees our frames.
+     */
+    private fun startRendering() {
+        Log.d(LOG_TAG, "Starting renderer")
+        val img = currentImage ?: return
+
         renderThread = Thread {
-            try {
-                val extractor = MediaExtractor()
-                extractor.setDataSource(videoPath)
-
-                // Find video track
-                var videoTrack = -1
-                for (i in 0 until extractor.trackCount) {
-                    val fmt = extractor.getTrackFormat(i)
-                    val mime = fmt.getString(MediaFormat.KEY_MIME) ?: ""
-                    if (mime.startsWith("video/")) {
-                        videoTrack = i
-                        break
+            while (isRunning) {
+                try {
+                    val canvas = surface?.lockCanvas(null)
+                    if (canvas != null) {
+                        // Draw our image/video frame
+                        val src = Rect(0, 0, img.width, img.height)
+                        val dst = Rect(0, 0, canvas.width, canvas.height)
+                        canvas.drawBitmap(img, src, dst, null)
+                        surface?.unlockCanvasAndPost(canvas)
+                        Log.d(LOG_TAG, "Frame drawn")
                     }
+                    Thread.sleep(FRAME_DURATION_MS)
+                } catch (e: Exception) {
+                    Log.e(LOG_TAG, "Render error: ${e.message}", e)
                 }
-
-                if (videoTrack < 0) {
-                    Log.e(LOG_TAG, "No video track found, falling back to image renderer")
-                    startImageRenderer()
-                    return@Thread
-                }
-
-                extractor.selectTrack(videoTrack)
-
-                val trackFmt = extractor.getTrackFormat(videoTrack)
-                val decoder = MediaCodec.createDecoderByType(
-                    trackFmt.getString(MediaFormat.KEY_MIME) ?: "video/avc"
-                )
-                decoder.configure(trackFmt, surface, null, 0)
-                decoder.start()
-
-                // Decoding loop
-                var done = false
-                while (isRunning && !done) {
-                    val inputIdx = decoder.dequeueInputBuffer(FRAME_DURATION_MS)
-                    if (inputIdx >= 0 && extractor.getSampleTime() >= 0) {
-                        val buf = decoder.getInputBuffer(inputIdx)
-                        if (buf != null) {
-                            val chunkSize = extractor.readSampleData(buf, 0)
-                            if (chunkSize > 0) {
-                                decoder.queueInputBuffer(inputIdx, 0, chunkSize,
-                                    extractor.getSampleTime(), 0)
-                                extractor.advance()
-                            } else {
-                                decoder.queueInputBuffer(inputIdx, 0, 0, -1,
-                                    MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                            }
-                        }
-                    }
-
-                    val info = MediaCodec.BufferInfo()
-                    val outIdx = decoder.dequeueOutputBuffer(info, FRAME_DURATION_MS)
-                    when {
-                        outIdx >= 0 -> {
-                            decoder.releaseOutputBuffer(outIdx, false)
-                        }
-                        outIdx == android.media.MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                            Thread.sleep(10)
-                        }
-                        else -> {
-                            // Format changed or other info
-                        }
-                    }
-                }
-
-                decoder.stop()
-                decoder.release()
-                extractor.release()
-
-            } catch (e: Exception) {
-                Log.e(LOG_TAG, "Video render error: ${e.message}", e)
-                startImageRenderer()
             }
         }
         renderThread?.start()
     }
 
     /**
-     * Write surface info to a file for the Zygisk hook to find.
-     */
-    private fun writeSurfacePath() {
-        try {
-            File("/data/local/tmp/kyc_bypasser").mkdirs()
-            File(SURFACE_PATH).writeText("surface_id=1\nresolution=720x1280\nmode=$currentMode\n")
-            Log.d(LOG_TAG, "Surface path written to $SURFACE_PATH")
-        } catch (e: Exception) {
-            Log.e(LOG_TAG, "Failed to write surface path: ${e.message}")
-        }
-    }
-
-    /**
-     * Create a foreground notification for the service (no NotificationCompat needed).
+     * Create a foreground notification for the service.
      */
     private fun createNotification(): Notification {
         val intent = Intent(this, MainActivity::class.java)
@@ -273,6 +252,8 @@ class VirtualCameraService : Service() {
                 Log.d(LOG_TAG, "Virtual camera stopping")
                 isRunning = false
                 renderThread?.interrupt()
+                cameraSession?.close()
+                cameraDevice?.close()
                 surface?.release()
                 surfaceTexture?.release()
                 stopForeground(true)
@@ -286,6 +267,8 @@ class VirtualCameraService : Service() {
         Log.d(LOG_TAG, "VirtualCameraService destroyed")
         isRunning = false
         renderThread?.interrupt()
+        cameraSession?.close()
+        cameraDevice?.close()
         surface?.release()
         surfaceTexture?.release()
         stopForeground(true)
