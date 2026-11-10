@@ -17,19 +17,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import com.kycbypasser.app.KycState
 import com.kycbypasser.app.ui.theme.CardBackground
 
 /**
  * Targets screen - select which apps to inject into.
- * Lists all installed apps with checkboxes.
+ * Uses shared KycState so selections persist across navigation.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TargetsScreen(
+    state: KycState,
     packageManager: PackageManager = androidx.compose.ui.platform.LocalContext.current.packageManager
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedPackages by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     // Get all installed apps that have at least one activity
     val allApps = remember {
@@ -73,12 +74,15 @@ fun TargetsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "SELECTED: ${selectedPackages.size}",
+                text = "SELECTED: ${state.selectedTargetPackages.size}",
                 fontSize = 14.sp,
                 color = Color.Gray
             )
-            if (selectedPackages.isNotEmpty()) {
-                TextButton(onClick = { selectedPackages = emptySet() }) {
+            if (state.selectedTargetPackages.isNotEmpty()) {
+                TextButton(onClick = {
+                    state.selectedTargetPackages = emptySet()
+                    state.saveTargets()
+                }) {
                     Text("CLEAR ALL")
                 }
             }
@@ -106,13 +110,15 @@ fun TargetsScreen(
                 items(filteredApps) { app ->
                     AppItem(
                         app = app,
-                        isSelected = selectedPackages.contains(app.packageName),
+                        isSelected = state.selectedTargetPackages.contains(app.packageName),
                         onToggle = {
-                            if (selectedPackages.contains(app.packageName)) {
-                                selectedPackages = selectedPackages - app.packageName
+                            val current = state.selectedTargetPackages.toMutableSet()
+                            if (current.contains(app.packageName)) {
+                                current.remove(app.packageName)
                             } else {
-                                selectedPackages = selectedPackages + app.packageName
+                                current.add(app.packageName)
                             }
+                            state.selectedTargetPackages = current
                         }
                     )
                 }
@@ -120,16 +126,17 @@ fun TargetsScreen(
         }
 
         // Save button at bottom
-        if (selectedPackages.isNotEmpty()) {
+        if (state.selectedTargetPackages.isNotEmpty()) {
             Button(
                 onClick = {
-                    saveTargets(selectedPackages)
+                    state.saveTargets()
+                    state.saveAllState()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             ) {
-                Icon(Icons.Default.Settings, null)
+                Icon(Icons.Default.People, null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("SAVE TARGETS")
             }
@@ -219,13 +226,4 @@ fun AppItem(
             onCheckedChange = { onToggle() }
         )
     }
-}
-
-/**
- * Save selected target packages to the module's targets.txt file.
- */
-fun saveTargets(packages: Set<String>) {
-    val targetsPath = com.kycbypasser.app.KYCApp.targetsPath()
-    val content = packages.joinToString("\n")
-    android.util.Log.d("Targets", "Saving targets: $content")
 }

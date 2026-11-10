@@ -15,30 +15,39 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.kycbypasser.app.KycState
 import com.kycbypasser.app.ui.theme.CardBackground
+import java.io.File
 
 /**
  * Media screen - select images and videos for injection.
+ * Uses shared KycState so selections persist across navigation.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalStdlibApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MediaScreen() {
-    var selectedImagePath by remember { mutableStateOf<String?>(null) }
-    var selectedVideoPath by remember { mutableStateOf<String?>(null) }
-    var currentMode by remember { mutableStateOf("static") } // "static" or "video"
-
+fun MediaScreen(
+    state: KycState
+) {
     // Image picker launcher
     val imageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.path?.let { selectedImagePath = it }
+        uri?.path?.let {
+            state.setSelectedImage(it)
+            state.saveAllState()
+        }
     }
 
     // Video picker launcher
+    var currentMode by remember { mutableStateOf(if (state.injectionMode == "video") "video" else "static") }
+
     val videoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.path?.let { selectedVideoPath = it }
+        uri?.path?.let {
+            state.setSelectedVideo(it)
+            state.saveAllState()
+        }
     }
 
     Column(
@@ -65,7 +74,11 @@ fun MediaScreen() {
 
                 FilterChip(
                     selected = currentMode == "static",
-                    onClick = { currentMode = "static" },
+                    onClick = {
+                        currentMode = "static"
+                        state.setMode("static")
+                        state.saveAllState()
+                    },
                     label = { Text("Static Image") },
                     leadingIcon = {
                         if (currentMode == "static") Icon(Icons.Default.Check, null)
@@ -74,7 +87,11 @@ fun MediaScreen() {
                 Spacer(modifier = Modifier.height(4.dp))
                 FilterChip(
                     selected = currentMode == "video",
-                    onClick = { currentMode = "video" },
+                    onClick = {
+                        currentMode = "video"
+                        state.setMode("video")
+                        state.saveAllState()
+                    },
                     label = { Text("Video Loop") },
                     leadingIcon = {
                         if (currentMode == "video") Icon(Icons.Default.Check, null)
@@ -102,12 +119,16 @@ fun MediaScreen() {
                         fontSize = 14.sp,
                         color = Color.Gray
                     )
-                    if (selectedImagePath != null) {
-                        Text(
-                            text = "SELECTED",
-                            fontSize = 11.sp,
-                            color = Color(0xFF00C853)
-                        )
+                    if (state.selectedImagePath != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF00C853), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "SELECTED",
+                                fontSize = 11.sp,
+                                color = Color(0xFF00C853)
+                            )
+                        }
                     }
                 }
 
@@ -119,13 +140,13 @@ fun MediaScreen() {
                         .fillMaxWidth()
                         .height(150.dp)
                         .background(
-                            if (selectedImagePath != null) Color(0xFF2E7D32)
+                            if (state.selectedImagePath != null) Color(0xFF2E7D32)
                             else CardBackground.copy(alpha = 0.5f),
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (selectedImagePath != null) {
+                    if (state.selectedImagePath != null) {
                         Text(
                             text = "IMAGE LOADED",
                             fontSize = 14.sp,
@@ -150,16 +171,21 @@ fun MediaScreen() {
                         onClick = { imageLauncher.launch("image/*") },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Settings, null)
+                        Icon(Icons.Default.Photo, null)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("CHOOSE IMAGE")
                     }
 
-                    if (selectedImagePath != null) {
+                    if (state.selectedImagePath != null) {
                         OutlinedButton(
-                            onClick = { selectedImagePath = null },
+                            onClick = {
+                                state.setSelectedImage(null)
+                                state.saveAllState()
+                            },
                             modifier = Modifier.weight(1f)
                         ) {
+                            Icon(Icons.Default.Clear, null)
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text("CLEAR")
                         }
                     }
@@ -186,12 +212,16 @@ fun MediaScreen() {
                         fontSize = 14.sp,
                         color = Color.Gray
                     )
-                    if (selectedVideoPath != null) {
-                        Text(
-                            text = "SELECTED",
-                            fontSize = 11.sp,
-                            color = Color(0xFF00C853)
-                        )
+                    if (state.selectedVideoPath != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF00C853), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "SELECTED",
+                                fontSize = 11.sp,
+                                color = Color(0xFF00C853)
+                            )
+                        }
                     }
                 }
 
@@ -203,13 +233,13 @@ fun MediaScreen() {
                         .fillMaxWidth()
                         .height(150.dp)
                         .background(
-                            if (selectedVideoPath != null) Color(0xFF1565C0)
+                            if (state.selectedVideoPath != null) Color(0xFF1565C0)
                             else CardBackground.copy(alpha = 0.5f),
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (selectedVideoPath != null) {
+                    if (state.selectedVideoPath != null) {
                         Text(
                             text = "VIDEO LOADED",
                             fontSize = 14.sp,
@@ -239,11 +269,16 @@ fun MediaScreen() {
                         Text("CHOOSE VIDEO")
                     }
 
-                    if (selectedVideoPath != null) {
+                    if (state.selectedVideoPath != null) {
                         OutlinedButton(
-                            onClick = { selectedVideoPath = null },
+                            onClick = {
+                                state.setSelectedVideo(null)
+                                state.saveAllState()
+                            },
                             modifier = Modifier.weight(1f)
                         ) {
+                            Icon(Icons.Default.Clear, null)
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text("CLEAR")
                         }
                     }
@@ -252,16 +287,16 @@ fun MediaScreen() {
         }
 
         // Save button
-        if (selectedImagePath != null || selectedVideoPath != null) {
+        if (state.selectedImagePath != null || state.selectedVideoPath != null) {
             Button(
                 onClick = {
-                    saveMedia(selectedImagePath, selectedVideoPath)
+                    state.saveAllState()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             ) {
-                Icon(Icons.Default.Settings, null)
+                Icon(Icons.Default.CameraAlt, null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("SAVE MEDIA")
             }
@@ -293,13 +328,4 @@ fun MediaScreen() {
             }
         }
     }
-}
-
-/**
- * Save selected media paths to the module config.
- */
-fun saveMedia(imagePath: String?, videoPath: String?) {
-    val configPath = com.kycbypasser.app.KYCApp.configPath()
-    android.util.Log.d("Media", "Save media: image=$imagePath, video=$videoPath")
-    // In real impl: write to config.json via IPC or direct file write
 }

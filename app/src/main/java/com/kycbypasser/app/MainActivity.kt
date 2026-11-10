@@ -20,6 +20,7 @@ import com.kycbypasser.app.ui.theme.CyanAccent
 
 /**
  * Main activity with bottom navigation between the four main screens.
+ * Creates shared KycState that all screens read/write.
  */
 class MainActivity : ComponentActivity() {
 
@@ -33,6 +34,9 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Create shared state that persists across all screens
+        val state = remember { KycState(this) }
 
         setContent {
             var currentScreen by remember { mutableStateOf(Screen.DASHBOARD) }
@@ -66,13 +70,13 @@ class MainActivity : ComponentActivity() {
                                 onClick = { currentScreen = Screen.DASHBOARD }
                             )
                             NavigationBarItem(
-                                icon = { Icon(Icons.Default.Settings, "Targets") },
+                                icon = { Icon(Icons.Default.People, "Targets") },
                                 label = { Text("Targets") },
                                 selected = currentScreen == Screen.TARGETS,
                                 onClick = { currentScreen = Screen.TARGETS }
                             )
                             NavigationBarItem(
-                                icon = { Icon(Icons.Default.Settings, "Media") },
+                                icon = { Icon(Icons.Default.CameraAlt, "Media") },
                                 label = { Text("Media") },
                                 selected = currentScreen == Screen.MEDIA,
                                 onClick = { currentScreen = Screen.MEDIA }
@@ -92,10 +96,10 @@ class MainActivity : ComponentActivity() {
                             .padding(paddingValues)
                     ) {
                         when (currentScreen) {
-                            Screen.DASHBOARD -> DashboardScreen()
-                            Screen.TARGETS -> TargetsScreen()
-                            Screen.MEDIA -> MediaScreen()
-                            Screen.SETTINGS -> SettingsScreen()
+                            Screen.DASHBOARD -> DashboardScreen(state)
+                            Screen.TARGETS -> TargetsScreen(state)
+                            Screen.MEDIA -> MediaScreen(state)
+                            Screen.SETTINGS -> SettingsScreen(state)
                         }
                     }
                 }

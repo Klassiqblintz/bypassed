@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/android" >
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:name=".KYCApp"
@@ -29,7 +33,16 @@
         <!-- Service for IPC with Zygisk companion -->
         <service
             android:name=".service.IpcService"
-            android:exported="false" />
+            android:exported="false"
+            android:process=":ipc" />
+
+        <!-- Virtual camera service — streams injected media to a surface
+             that the target app reads as its camera output. Works without root. -->
+        <service
+            android:name=".service.VirtualCameraService"
+            android:exported="false"
+            android:foregroundServiceType="camera"
+            android:process=":vcamera" />
     </application>
 
 </manifest>

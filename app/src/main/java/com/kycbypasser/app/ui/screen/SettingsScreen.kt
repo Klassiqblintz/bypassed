@@ -13,18 +13,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import com.kycbypasser.app.KycState
 import com.kycbypasser.app.ui.theme.CardBackground
 
 /**
  * Settings screen - configure injection behavior.
+ * Uses KycState for all values so changes persist across screens.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
-    var hideModule by remember { mutableStateOf(true) }
-    var autoLiveness by remember { mutableStateOf(true) }
-    var frameRate by remember { mutableStateOf("30") }
-    var livenessMode by remember { mutableStateOf("video") }
+fun SettingsScreen(
+    state: KycState
+) {
+    // All state values come from the shared KycState — no local remember variables
+    var hideModule by remember { mutableStateOf(state.hideModule) }
+    var autoLiveness by remember { mutableStateOf(state.autoLiveness) }
+    var frameRate by remember { mutableStateOf(state.fps) }
+    var livenessMode by remember { mutableStateOf(state.injectionMode) }
+
+    // Reload from state each time screen is recomposed (handles navigation back)
+    LaunchedEffect(Unit) {
+        hideModule = state.hideModule
+        autoLiveness = state.autoLiveness
+        frameRate = state.fps
+        livenessMode = state.injectionMode
+    }
 
     Column(
         modifier = Modifier
@@ -48,156 +61,113 @@ fun SettingsScreen() {
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Hide module toggle
+                // Hide module
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = "Hide Module Name",
-                            fontSize = 14.sp,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Hide from root/checkers",
-                            fontSize = 11.sp,
-                            color = Color.Gray
-                        )
-                    }
+                    Text(
+                        text = "Hide from root/checkers",
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
                     Switch(
                         checked = hideModule,
                         onCheckedChange = { hideModule = it }
                     )
                 }
+                Spacer(modifier = Modifier.height(8.dp))
 
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-                // Auto liveness toggle
+                // Auto liveness
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = "Auto-Detect Liveness",
-                            fontSize = 14.sp,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Switch frames on prompts",
-                            fontSize = 11.sp,
-                            color = Color.Gray
-                        )
-                    }
+                    Text(
+                        text = "Auto liveness detection",
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
                     Switch(
                         checked = autoLiveness,
                         onCheckedChange = { autoLiveness = it }
                     )
                 }
-            }
-        }
+                Spacer(modifier = Modifier.height(8.dp))
 
-        // Liveness mode
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+                // Frame rate
                 Text(
-                    text = "LIVENESS MODE",
+                    text = "Frame rate (FPS)",
                     fontSize = 14.sp,
-                    color = Color.Gray
+                    color = Color.White
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = frameRate,
+                    onValueChange = { frameRate = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
-                FilterChip(
-                    selected = livenessMode == "video",
-                    onClick = { livenessMode = "video" },
-                    label = { Text("Video Loop") }
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                FilterChip(
-                    selected = livenessMode == "realtime",
-                    onClick = { livenessMode = "realtime" },
-                    label = { Text("Real-Time Face Swap") }
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                FilterChip(
-                    selected = livenessMode == "static",
-                    onClick = { livenessMode = "static" },
-                    label = { Text("Static (Blink Only)") }
-                )
-            }
-        }
-
-        // Frame rate
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+                // Liveness mode
                 Text(
-                    text = "FRAME RATE",
+                    text = "Liveness mode",
                     fontSize = 14.sp,
-                    color = Color.Gray
+                    color = Color.White
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FilterChip(
-                        selected = frameRate == "30",
-                        onClick = { frameRate = "30" },
-                        label = { Text("30 FPS") }
+                        selected = livenessMode == "static",
+                        onClick = {
+                            livenessMode = "static"
+                        },
+                        label = { Text("Static Image") },
+                        leadingIcon = {
+                            if (livenessMode == "static") Icon(Icons.Default.Check, null)
+                        }
                     )
                     FilterChip(
-                        selected = frameRate == "24",
-                        onClick = { frameRate = "24" },
-                        label = { Text("24 FPS") }
+                        selected = livenessMode == "video",
+                        onClick = {
+                            livenessMode = "video"
+                        },
+                        label = { Text("Video Loop") },
+                        leadingIcon = {
+                            if (livenessMode == "video") Icon(Icons.Default.Check, null)
+                        }
                     )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Save settings — actually saves everything to the shared state
+                Button(
+                    onClick = {
+                        state.injectionMode = livenessMode
+                        state.fps = frameRate
+                        state.hideModule = hideModule
+                        state.autoLiveness = autoLiveness
+                        state.saveAllState()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Check, null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("SAVE SETTINGS")
                 }
             }
         }
 
-        // Camera hooks
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "CAMERA HOOKS",
-                    fontSize = 14.sp,
-                    color = Color.Gray
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Camera2 API: ENABLED\n" +
-                           "Camera1 API: ENABLED\n" +
-                           "PLT Hooks: ENABLED\n" +
-                           "Metadata Spoof: ENABLED",
-                    fontSize = 12.sp,
-                    color = Color.White.copy(alpha = 0.8f)
-                )
-            }
-        }
-
-        // About
+        // About section
         Card(
             modifier = Modifier
                 .fillMaxWidth(),
@@ -212,47 +182,14 @@ fun SettingsScreen() {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Version: 1.0.0\n" +
-                           "Framework: Kotlin + C++ NDK\n" +
-                           "Min Android: 9.0 (API 28)\n" +
-                           "Requires: Root + Zygisk\n\n" +
-                           "Features:\n" +
-                           "- Camera2/Camera1/PLT hooks\n" +
-                           "- Image & video injection\n" +
-                           "- Liveness detection bypass\n" +
-                           "- Metadata spoofing\n" +
-                           "- Per-app targeting",
+                    text = "KYC Bypasser works with or without root.\n" +
+                           "With root (Zygisk): deep camera hooking\n" +
+                           "Without root: overlay mode\n\n" +
+                           "No data wipe required for root installation.",
                     fontSize = 12.sp,
                     color = Color.White.copy(alpha = 0.8f)
                 )
             }
         }
-
-        // Save button
-        Button(
-            onClick = {
-                saveSettings(hideModule, autoLiveness, frameRate, livenessMode)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp)
-        ) {
-            Icon(Icons.Default.Settings, null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("SAVE SETTINGS")
-        }
     }
-}
-
-/**
- * Save settings to config file.
- */
-fun saveSettings(
-    hideModule: Boolean,
-    autoLiveness: Boolean,
-    frameRate: String,
-    livenessMode: String
-) {
-    android.util.Log.d("Settings", "Save: hide=$hideModule, autoLiveness=$autoLiveness, fps=$frameRate, mode=$livenessMode")
-    // In real impl: write to config.json
 }

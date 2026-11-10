@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import com.kycbypasser.app.KYCApp
+import com.kycbypasser.app.KycState
 import com.kycbypasser.app.ui.theme.CyanAccent
 import com.kycbypasser.app.ui.theme.CardBackground
 import com.kycbypasser.app.ui.theme.SuccessGreen
@@ -22,15 +22,13 @@ import com.kycbypasser.app.ui.theme.WarningOrange
 
 /**
  * Dashboard screen - shows overall status and quick actions.
+ * Reads/writes shared KycState so selections persist across screens.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen() {
-    var isActive by remember { mutableStateOf(false) }
-    var targetCount by remember { mutableStateOf(0) }
-    var hasImage by remember { mutableStateOf(false) }
-    var hasVideo by remember { mutableStateOf(false) }
-
+fun DashboardScreen(
+    state: KycState
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -63,38 +61,49 @@ fun DashboardScreen() {
                         modifier = Modifier
                             .size(16.dp)
                             .background(
-                                if (isActive) SuccessGreen else WarningOrange,
+                                if (state.isActive) SuccessGreen else WarningOrange,
                                 shape = androidx.compose.foundation.shape.CircleShape
                             )
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isActive) "ACTIVE" else "INACTIVE",
+                        text = if (state.isActive) "ACTIVE" else "INACTIVE",
                         fontSize = 20.sp,
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        color = if (isActive) SuccessGreen else WarningOrange
+                        color = if (state.isActive) SuccessGreen else WarningOrange
                     )
                 }
 
                 // Toggle button
                 Button(
                     onClick = {
-                        isActive = !isActive
-                        updateConfig("active", isActive)
+                        state.toggleActive()
+                        if (state.isActive) {
+                            // Start virtual camera service
+                            val intent = android.content.Intent(state.context, com.kycbypasser.app.service.VirtualCameraService::class.java)
+                            android.content.ContextCompat.startForegroundService(state.context, intent)
+                            android.util.Log.d("Dashboard", "Virtual camera started")
+                        } else {
+                            // Stop virtual camera service
+                            val intent = android.content.Intent(state.context, com.kycbypasser.app.service.VirtualCameraService::class.java)
+                            intent.action = com.kycbypasser.app.service.VirtualCameraService.CMD_STOP
+                            state.context.startService(intent)
+                            android.util.Log.d("Dashboard", "Virtual camera stopped")
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isActive) Color(0xFF1B5E20) else Color(0xFFE65100)
+                        containerColor = if (state.isActive) Color(0xFF1B5E20) else Color(0xFFE65100)
                     )
                 ) {
                     Icon(
-                        imageVector = if (isActive) Icons.Default.CheckCircle else Icons.Default.Clear,
+                        imageVector = if (state.isActive) Icons.Default.CheckCircle else Icons.Default.Clear,
                         contentDescription = null
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (isActive) "DEACTIVATE" else "ACTIVATE")
+                    Text(if (state.isActive) "DEACTIVATE" else "ACTIVATE")
                 }
             }
         }
@@ -105,15 +114,15 @@ fun DashboardScreen() {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             StatCard(
-                icon = Icons.Default.Settings,
+                icon = Icons.Default.People,
                 title = "Targets",
-                value = targetCount.toString(),
+                value = state.selectedTargetPackages.size.toString(),
                 modifier = Modifier.weight(1f)
             )
             StatCard(
-                icon = Icons.Default.Settings,
+                icon = Icons.Default.Photo,
                 title = "Image",
-                value = if (hasImage) "SET" else "NONE",
+                value = if (state.selectedImagePath != null) "SET" else "NONE",
                 modifier = Modifier.weight(1f)
             )
         }
@@ -125,13 +134,13 @@ fun DashboardScreen() {
             StatCard(
                 icon = Icons.Default.PlayArrow,
                 title = "Video",
-                value = if (hasVideo) "SET" else "NONE",
+                value = if (state.selectedVideoPath != null) "SET" else "NONE",
                 modifier = Modifier.weight(1f)
             )
             StatCard(
                 icon = Icons.Default.Settings,
                 title = "Mode",
-                value = "STATIC",
+                value = if (state.injectionMode == "video") "VIDEO LOOP" else "STATIC",
                 modifier = Modifier.weight(1f)
             )
         }
@@ -153,21 +162,21 @@ fun DashboardScreen() {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 OutlinedButton(
-                    onClick = { /* Navigate to targets */ },
+                    onClick = { /* Navigation handled by parent */ },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 8.dp)
                 ) {
-                    Icon(Icons.Default.Settings, null)
+                    Icon(Icons.Default.People, null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("MANAGE TARGETS")
                 }
 
                 OutlinedButton(
-                    onClick = { /* Navigate to media */ },
+                    onClick = { /* Navigation handled by parent */ },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Settings, null)
+                    Icon(Icons.Default.CameraAlt, null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("MANAGE MEDIA")
                 }
@@ -238,11 +247,4 @@ fun StatCard(
             )
         }
     }
-}
-
-/**
- * Update the module config file.
- */
-fun updateConfig(key: String, value: Any) {
-    android.util.Log.d("Dashboard", "Update config: $key = $value")
 }
