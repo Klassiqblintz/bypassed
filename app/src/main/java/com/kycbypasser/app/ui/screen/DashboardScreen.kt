@@ -111,7 +111,7 @@ fun DashboardScreen() {
                 modifier = Modifier.weight(1f)
             )
             StatCard(
-                icon = Icons.Default.Image,
+                icon = Icons.Default.Settings,
                 title = "Image",
                 value = if (hasImage) "SET" else "NONE",
                 modifier = Modifier.weight(1f)
@@ -167,7 +167,7 @@ fun DashboardScreen() {
                     onClick = { /* Navigate to media */ },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Image, null)
+                    Icon(Icons.Default.Settings, null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("MANAGE MEDIA")
                 }

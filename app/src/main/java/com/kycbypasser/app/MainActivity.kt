@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
                                 onClick = { currentScreen = Screen.TARGETS }
                             )
                             NavigationBarItem(
-                                icon = { Icon(Icons.Default.Image, "Media") },
+                                icon = { Icon(Icons.Default.Settings, "Media") },
                                 label = { Text("Media") },
                                 selected = currentScreen == Screen.MEDIA,
                                 onClick = { currentScreen = Screen.MEDIA }

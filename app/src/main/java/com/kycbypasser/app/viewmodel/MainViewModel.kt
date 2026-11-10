@@ -19,7 +19,7 @@ import java.io.File
  */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
-    private const val APP_VERSION = "1.0.0"
+    private val APP_VERSION = "1.0.0"
 
     // ── State ──
     private val _isActive = MutableStateFlow(false)
