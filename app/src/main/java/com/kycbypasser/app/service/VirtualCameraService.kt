@@ -18,7 +18,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import android.view.Surface
-import android.view.SurfaceTexture
+import android.graphics.SurfaceTexture
 import com.kycbypasser.app.KycState
 import com.kycbypasser.app.MainActivity
 
