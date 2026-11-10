@@ -4,9 +4,11 @@
  *
  * STATIC mode: Loads a JPEG/PNG and returns it as each frame.
  * VIDEO mode:  Decodes an MP4 using MediaCodec and loops frames.
+ * REALTIME mode: Uses OpenCV face detection + warp for live face swap.
  * Each frame is rendered to a SurfaceTexture via EGL.
  */
 #include "frame_publisher.h"
+#include "face_detector.h"
 #include "camera_hook.h"
 #include <android/log.h>
 #include <dlfcn.h>
@@ -79,7 +81,11 @@ void load_video(const char *path) {
     }
 }
 
+<<<<<<< HEAD
+jobject get_next_frame(JNIEnv *env, jobject input_surface) {
+=======
 jobject get_next_frame(JNIEnv *env) {
+>>>>>>> 6faa654b6538ae37d4e5b0d222ff56b9276b1dbf
     if (!s_initialized) return nullptr;
 
     struct timeval now;
@@ -92,8 +98,20 @@ jobject get_next_frame(JNIEnv *env) {
     }
     s_last_frame_time = now_ms;
 
+<<<<<<< HEAD
+    if (s_mode == MODE_STATIC) {
+        return get_static_frame(env);
+    }
+    if (s_mode == MODE_VIDEO) {
+        return get_video_frame(env);
+    }
+    if (s_mode == MODE_REALTIME) {
+        return get_realtime_frame(env, input_surface);
+    }
+=======
     if (s_mode == MODE_STATIC) return get_static_frame(env);
     if (s_mode == MODE_VIDEO) return get_video_frame(env);
+>>>>>>> 6faa654b6538ae37d4e5b0d222ff56b9276b1dbf
     return nullptr;
 }
 

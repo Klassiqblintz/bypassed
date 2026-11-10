@@ -22,7 +22,7 @@
 void init_frame_publisher();
 void load_image(const char *path);
 void load_video(const char *path);
-jobject get_next_frame(JNIEnv *env);
+jobject get_next_frame(JNIEnv *env, jobject input_surface);
 int get_frame_rate();
 void shutdown_frame_publisher();
 
