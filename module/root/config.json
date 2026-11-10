@@ -1,0 +1,9 @@
+{
+    "active": false,
+    "mode": "static",
+    "image_path": "",
+    "video_path": "",
+    "hide_module": true,
+    "auto_liveness": true,
+    "fps": 30
+}
