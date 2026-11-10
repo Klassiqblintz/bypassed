@@ -1,7 +1,5 @@
 package com.kycbypasser.app.ui.screen
 
-import android.provider.Settings
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -32,22 +30,12 @@ import com.kycbypasser.app.ui.theme.WarningOrange
 fun DashboardScreen(
     state: KycState
 ) {
-    var showPermissionDialog by remember { mutableStateOf(false) }
-    var hasOverlayPermission by remember { mutableStateOf(
-        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M &&
-        Settings.canDrawOverlays(state.appContext)
-    ) }
+    var isCameraGranted by remember { mutableStateOf(false) }
 
-    // Re-check permission when dialog is dismissed
-    if (showPermissionDialog) {
-        LaunchedEffect(Unit) {
-            hasOverlayPermission = Settings.canDrawOverlays(state.appContext)
-            if (hasOverlayPermission) {
-                showPermissionDialog = false
-            } else {
-                // Stay open until granted
-            }
-        }
+    LaunchedEffect(Unit) {
+        isCameraGranted = state.appContext.checkSelfPermission(
+            android.Manifest.permission.CAMERA
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
     Column(
@@ -95,8 +83,7 @@ fun DashboardScreen(
                     )
                 }
 
-                // Overlay permission status
-                if (!hasOverlayPermission) {
+                if (!isCameraGranted) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -110,7 +97,7 @@ fun DashboardScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Overlay permission REQUIRED",
+                            text = "Camera permission REQUIRED",
                             fontSize = 11.sp,
                             color = WarningOrange,
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
@@ -121,25 +108,15 @@ fun DashboardScreen(
                 // Toggle button
                 Button(
                     onClick = {
-                        if (!hasOverlayPermission) {
-                            // Launch overlay permission settings
-                            val intent = Intent(
-                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                android.net.Uri.parse("package:${state.appContext.packageName}")
-                            )
-                            state.appContext.startActivity(intent)
-                            showPermissionDialog = true
+                        state.toggleActive()
+                        val intent = android.content.Intent(state.appContext, VirtualCameraService::class.java)
+                        if (state.isActive) {
+                            intent.action = VirtualCameraService.CMD_START
                         } else {
-                            state.toggleActive()
-                            val intent = android.content.Intent(state.appContext, VirtualCameraService::class.java)
-                            if (state.isActive) {
-                                intent.action = VirtualCameraService.CMD_START
-                            } else {
-                                intent.action = VirtualCameraService.CMD_STOP
-                            }
-                            state.startService(intent)
-                            android.util.Log.d("Dashboard", "Virtual camera ${if (state.isActive) "started" else "stopped"}")
+                            intent.action = VirtualCameraService.CMD_STOP
                         }
+                        state.startService(intent)
+                        android.util.Log.d("Dashboard", "Virtual camera ${if (state.isActive) "started" else "stopped"}")
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -251,11 +228,10 @@ fun DashboardScreen(
                 Text(
                     text = "1. Select target app(s) that use camera for KYC\n" +
                            "2. Choose an image or video to inject\n" +
-                           "3. Tap ACTIVATE — grants overlay permission if needed\n" +
-                           "4. Open the target app — your media replaces the camera preview\n" +
-                           "5. The target app's camera captures your overlay (screen)\n\n" +
-                           "WORKS WITH: Front camera KYC apps (most common)\n" +
-                           "REQUIRES: SYSTEM_ALERT_WINDOW (overlay) permission",
+                           "3. Tap ACTIVATE — opens front camera\n" +
+                           "4. Each camera frame draws your image on top\n" +
+                           "5. Target app's camera sees YOUR image, not the sensor\n\n" +
+                           "NO ROOT NEEDED — uses Camera2 API",
                     fontSize = 12.sp,
                     color = Color.White.copy(alpha = 0.8f)
                 )
@@ -280,9 +256,8 @@ fun DashboardScreen(
                 Text(
                     text = "- Use a BRIGHT, CLEAR image for best results\n" +
                            "- For video mode, the first frame is used\n" +
-                           "- Hold the phone at a normal distance from your face\n" +
-                           "- Make sure your image fills the screen\n" +
-                           "- Works best with front camera KYC apps",
+                           "- Works with front camera KYC apps\n" +
+                           "- Check logcat for \"VirtualCamera\" tag to debug",
                     fontSize = 12.sp,
                     color = Color.White.copy(alpha = 0.8f)
                 )
