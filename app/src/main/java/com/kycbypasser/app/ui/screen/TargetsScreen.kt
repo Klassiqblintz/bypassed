@@ -28,14 +28,10 @@ fun TargetsScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedPackages by remember { mutableStateOf<Set<String>>(emptySet()) }
 
-    // Get all installed apps that have camera permission
+    // Get all installed apps that have at least one activity
     val allApps = remember {
-        packageManager.getInstalledPackages(PackageManager.GET_PERMISSIONS)
-            .filter { pkg ->
-                val hasCamera = pkg.requestedPermissions?.any { it == "android.permission.CAMERA" } == true
-                val hasActivity = pkg.activities?.isNotEmpty() == true
-                hasCamera && hasActivity
-            }
+        packageManager.getInstalledPackages(PackageManager.GET_ACTIVITIES)
+            .filter { pkg -> pkg.activities?.isNotEmpty() == true }
             .map { pkg ->
                 AppInfo(
                     packageName = pkg.packageName,
@@ -95,7 +91,7 @@ fun TargetsScreen(
             ) {
                 Text(
                     text = if (searchQuery.isNotEmpty()) "No apps match your search"
-                          else "No camera apps found",
+                          else "No apps found",
                     color = Color.Gray
                 )
             }
@@ -156,7 +152,7 @@ fun AppItem(
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // App icon placeholder (would use actual icon in real impl)
+        // App icon placeholder
         Box(
             modifier = Modifier
                 .size(36.dp)
@@ -190,7 +186,7 @@ fun AppItem(
             )
         }
 
-            Switch(
+        Switch(
             checked = isSelected,
             onCheckedChange = { onToggle() }
         )
@@ -204,5 +200,4 @@ fun saveTargets(packages: Set<String>) {
     val targetsPath = com.kycbypasser.app.KYCApp.targetsPath()
     val content = packages.joinToString("\n")
     android.util.Log.d("Targets", "Saving targets: $content")
-    // In real impl: write to file via File API or IPC to companion process
 }
