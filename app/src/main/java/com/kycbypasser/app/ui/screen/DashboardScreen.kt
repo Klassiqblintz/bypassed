@@ -1,6 +1,7 @@
 package com.kycbypasser.app.ui.screen
 
 import android.provider.Settings
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState

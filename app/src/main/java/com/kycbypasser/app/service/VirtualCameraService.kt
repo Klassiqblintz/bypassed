@@ -49,7 +49,6 @@ class VirtualCameraService : Service() {
     private var renderThread: Thread? = null
     private var overlayView: SurfaceView? = null
     private var windowManager: WindowManager? = null
-    private var surfaceHolder: SurfaceHolder? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
@@ -89,7 +88,7 @@ class VirtualCameraService : Service() {
                 try {
                     val retriever = MediaMetadataRetriever()
                     retriever.setDataSource(state.selectedVideoPath)
-                    currentFrame = retriever.frameAtTime(
+                    currentFrame = retriever.getFrameAtTime(
                         0,
                         MediaMetadataRetriever.OPTION_CLOSEST
                     )
@@ -122,9 +121,7 @@ class VirtualCameraService : Service() {
      */
     private fun createOverlay() {
         overlayView = SurfaceView(this)
-        surfaceHolder = overlayView?.surfaceHolder
-
-        surfaceHolder?.addCallback(object : SurfaceHolder.Callback {
+        overlayView?.holder?.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(holder: SurfaceHolder) {
                 Log.d(LOG_TAG, "Overlay surface created")
             }
@@ -192,7 +189,7 @@ class VirtualCameraService : Service() {
         renderThread = Thread {
             while (isRunning) {
                 try {
-                    val holder = surfaceHolder ?: continue
+                    val holder = overlayView?.holder ?: continue
                     val canvas = holder.lockCanvas(null)
                     if (canvas != null) {
                         // Draw black background
