@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
 
     <application
         android:name=".KYCApp"
@@ -31,6 +33,12 @@
         <service
             android:name=".service.IpcService"
             android:exported="false" />
+
+        <!-- Virtual camera overlay service (non-root) -->
+        <service
+            android:name=".service.VirtualCameraService"
+            android:exported="false"
+            android:foregroundServiceType="camera" />
     </application>
 
 </manifest>
