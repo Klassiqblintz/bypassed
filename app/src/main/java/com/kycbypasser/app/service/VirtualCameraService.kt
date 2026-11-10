@@ -8,24 +8,27 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Rect
-import android.hardware.camera2.CameraCharacteristics
-import android.hardware.camera2.CameraDevice
-import android.hardware.camera2.CameraManager
-import android.hardware.camera2.CameraCaptureSession
+import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import android.view.SurfaceHolder
+import android.view.SurfaceView
+import android.view.WindowManager
 import com.kycbypasser.app.KycState
 import com.kycbypasser.app.MainActivity
 
 /**
- * Virtual camera service — opens the device's front camera,
- * each frame draws our selected image/video onto it,
- * so the target app sees our frames instead of the real camera.
+ * Virtual camera service — uses a full-screen overlay to replace
+ * the target app's camera preview with our selected image/video.
  *
- * Works WITHOUT root. Uses Camera2 API.
+ * WITHOUT root: Opens a WindowManager overlay on top of all apps.
+ * Each frame draws our selected image/video to it.
+ * The target app's camera captures the overlay (screen) instead of the sensor.
+ *
+ * Works on Android 6+ with SYSTEM_ALERT_WINDOW permission.
  */
 class VirtualCameraService : Service() {
 
@@ -39,15 +42,14 @@ class VirtualCameraService : Service() {
         const val FRAME_DURATION_MS = 1000L / DEFAULT_FPS
     }
 
-    private var cameraDevice: CameraDevice? = null
-    private var cameraSession: CameraCaptureSession? = null
-    private var surfaceTexture: android.graphics.SurfaceTexture? = null
-    private var surface: android.view.Surface? = null
-    private var currentImage: Bitmap? = null
+    private var currentFrame: Bitmap? = null
     private var currentVideoPath: String? = null
     private var currentMode: String = "static"
     private var isRunning = false
     private var renderThread: Thread? = null
+    private var overlayView: SurfaceView? = null
+    private var windowManager: WindowManager? = null
+    private var surfaceHolder: SurfaceHolder? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
@@ -59,149 +61,148 @@ class VirtualCameraService : Service() {
         // Load configuration
         loadConfig()
 
-        // Open the front camera
-        openCamera()
+        // Create full-screen overlay
+        createOverlay()
 
-        // Create surface for drawing our frames
-        createSurface()
-
-        // Start rendering (each frame draws our image/video)
+        // Start rendering (each frame draws our image/video to the overlay)
         startRendering()
     }
 
+    /**
+     * Load the selected image/video from KycState.
+     * For video mode, extract the first frame as the overlay frame.
+     */
     private fun loadConfig() {
         try {
             val state = KycState(this)
             currentMode = state.injectionMode
-            currentImage = if (!state.selectedImagePath.isNullOrEmpty()) {
-                BitmapFactory.decodeFile(state.selectedImagePath)
-            } else {
-                // Placeholder white bitmap
-                Bitmap.createBitmap(720, 1280, Bitmap.Config.ARGB_8888)
-            }
             currentVideoPath = state.selectedVideoPath
 
-            if (currentImage == null || currentImage!!.width == 0) {
-                currentImage = Bitmap.createBitmap(720, 1280, Bitmap.Config.ARGB_8888)
+            // Try to load image first
+            if (!state.selectedImagePath.isNullOrEmpty()) {
+                currentFrame = BitmapFactory.decodeFile(state.selectedImagePath)
             }
-        } catch (e: Exception) {
-            Log.e(LOG_TAG, "Failed to load config: ${e.message}")
-        }
-    }
 
-    private fun openCamera() {
-        try {
-            val cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-            var frontCameraId: String? = null
-
-            for (cameraId in cameraManager.cameraIdList) {
-                val characteristics = cameraManager.getCameraCharacteristics(cameraId)
-                val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
-                if (facing == CameraCharacteristics.LENS_FACING_FRONT) {
-                    frontCameraId = cameraId
-                    break
+            // If no image but has video, extract first frame
+            if ((currentFrame == null || currentFrame!!.width == 0) &&
+                !state.selectedVideoPath.isNullOrEmpty()) {
+                try {
+                    val retriever = MediaMetadataRetriever()
+                    retriever.setDataSource(state.selectedVideoPath)
+                    currentFrame = retriever.frameAtTime(
+                        0,
+                        MediaMetadataRetriever.OPTION_CLOSEST
+                    )
+                    retriever.release()
+                } catch (e: Exception) {
+                    Log.e(LOG_TAG, "Failed to extract video frame: ${e.message}")
                 }
             }
 
-            if (frontCameraId == null) {
-                Log.e(LOG_TAG, "No front camera found")
-                return
+            // Default to white bitmap if nothing loaded
+            if (currentFrame == null || currentFrame!!.width == 0 || currentFrame!!.height == 0) {
+                currentFrame = Bitmap.createBitmap(720, 1280, Bitmap.Config.ARGB_8888).apply {
+                    eraseColor(android.graphics.Color.WHITE)
+                }
             }
 
-            Log.d(LOG_TAG, "Opening front camera: $frontCameraId")
-            cameraManager.openCamera(frontCameraId, stateCallback, mainHandler)
+            Log.d(LOG_TAG, "Loaded frame: ${currentFrame!!.width}x${currentFrame!!.height}, mode=$currentMode")
         } catch (e: Exception) {
-            Log.e(LOG_TAG, "Failed to open camera: ${e.message}", e)
+            Log.e(LOG_TAG, "Failed to load config: ${e.message}", e)
+            currentFrame = Bitmap.createBitmap(720, 1280, Bitmap.Config.ARGB_8888).apply {
+                eraseColor(android.graphics.Color.WHITE)
+            }
         }
-    }
-
-    private val stateCallback = object : CameraDevice.StateCallback() {
-        override fun onOpened(device: CameraDevice) {
-            cameraDevice = device
-            Log.d(LOG_TAG, "Camera opened successfully")
-            createCaptureSession()
-        }
-
-        override fun onDisconnected(device: CameraDevice) {
-            Log.d(LOG_TAG, "Camera disconnected")
-            cameraDevice = null
-        }
-
-        override fun onError(device: CameraDevice, error: Int) {
-            Log.e(LOG_TAG, "Camera error: $error")
-        }
-    }
-
-    private fun createSurface() {
-        try {
-            surfaceTexture = android.graphics.SurfaceTexture(1)
-            surfaceTexture?.setDefaultBufferSize(720, 1280)
-            surface = android.view.Surface(surfaceTexture)
-            Log.d(LOG_TAG, "Surface created")
-        } catch (e: Exception) {
-            Log.e(LOG_TAG, "Failed to create surface: ${e.message}", e)
-        }
-    }
-
-    private fun createCaptureSession() {
-        val surf = surface ?: run {
-            Log.e(LOG_TAG, "No surface available")
-            return
-        }
-        val cam = cameraDevice ?: run {
-            Log.e(LOG_TAG, "No camera device available")
-            return
-        }
-
-        cam.createCaptureSession(
-            listOf(surf),
-            object : CameraCaptureSession.StateCallback() {
-                override fun onConfigured(session: CameraCaptureSession) {
-                    cameraSession = session
-                    try {
-                        val request = cam.createCaptureRequest(
-                            CameraDevice.TEMPLATE_PREVIEW
-                        )
-                        request.addTarget(surf)
-                        session.setRepeatingRequest(
-                            request.build(),
-                            null,
-                            mainHandler
-                        )
-                        Log.d(LOG_TAG, "Camera session configured with our Surface")
-                    } catch (e: Exception) {
-                        Log.e(LOG_TAG, "Failed to create request: ${e.message}", e)
-                    }
-                }
-
-                override fun onConfigureFailed(session: CameraCaptureSession) {
-                    Log.e(LOG_TAG, "Failed to configure camera session")
-                }
-            },
-            mainHandler
-        )
     }
 
     /**
-     * Each frame, draw our image/video to the Surface.
-     * Since the camera outputs to this same Surface, our drawing
-     * overrides the camera's sensor data — the target app sees our frames.
+     * Create a full-screen overlay SurfaceView using WindowManager.
+     * Tries TYPE_APPLICATION_OVERLAY first (needs SYSTEM_ALERT_WINDOW),
+     * falls back to TYPE_PHONE if permission not granted.
+     */
+    private fun createOverlay() {
+        overlayView = SurfaceView(this)
+        surfaceHolder = overlayView?.surfaceHolder
+
+        surfaceHolder?.addCallback(object : SurfaceHolder.Callback {
+            override fun surfaceCreated(holder: SurfaceHolder) {
+                Log.d(LOG_TAG, "Overlay surface created")
+            }
+
+            override fun surfaceChanged(
+                holder: SurfaceHolder,
+                format: Int,
+                width: Int,
+                height: Int
+            ) {
+                Log.d(LOG_TAG, "Overlay surface changed: $width x $height")
+            }
+
+            override fun surfaceDestroyed(holder: SurfaceHolder) {
+                Log.d(LOG_TAG, "Overlay surface destroyed")
+                isRunning = false
+            }
+        })
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_FULLSCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            android.graphics.PixelFormat.TRANSLUCENT
+        )
+
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+
+        // Try TYPE_APPLICATION_OVERLAY first
+        var success = false
+        try {
+            windowManager?.addView(overlayView, params)
+            Log.d(LOG_TAG, "Overlay created with TYPE_APPLICATION_OVERLAY")
+            success = true
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "TYPE_APPLICATION_OVERLAY failed, trying TYPE_PHONE: ${e.message}")
+            // Fall back to TYPE_PHONE (doesn't need special permission)
+            params.type = WindowManager.LayoutParams.TYPE_PHONE
+            try {
+                windowManager?.addView(overlayView, params)
+                Log.d(LOG_TAG, "Overlay created with TYPE_PHONE (fallback)")
+                success = true
+            } catch (e2: Exception) {
+                Log.e(LOG_TAG, "TYPE_PHONE also failed: ${e2.message}", e2)
+            }
+        }
+
+        if (!success) {
+            Log.e(LOG_TAG, "Overlay creation FAILED")
+        }
+    }
+
+    /**
+     * Each frame, draw our image/video to the overlay's SurfaceView.
+     * The target app's camera captures this overlay (screen) instead of the sensor.
      */
     private fun startRendering() {
-        Log.d(LOG_TAG, "Starting renderer")
-        val img = currentImage ?: return
-
+        Log.d(LOG_TAG, "Starting renderer, FPS=$DEFAULT_FPS")
+        val frame = currentFrame ?: return
         renderThread = Thread {
             while (isRunning) {
                 try {
-                    val canvas = surface?.lockCanvas(null)
+                    val holder = surfaceHolder ?: continue
+                    val canvas = holder.lockCanvas(null)
                     if (canvas != null) {
-                        // Draw our image/video frame
-                        val src = Rect(0, 0, img.width, img.height)
+                        // Draw black background
+                        canvas.drawColor(android.graphics.Color.BLACK)
+                        // Draw our image/video frame to fill the screen
+                        val src = Rect(0, 0, frame.width, frame.height)
                         val dst = Rect(0, 0, canvas.width, canvas.height)
-                        canvas.drawBitmap(img, src, dst, null)
-                        surface?.unlockCanvasAndPost(canvas)
-                        Log.d(LOG_TAG, "Frame drawn")
+                        canvas.drawBitmap(frame, src, dst, null)
+                        holder.unlockCanvasAndPost(canvas)
+                        Log.d(LOG_TAG, "Frame drawn (${canvas.width}x${canvas.height})")
                     }
                     Thread.sleep(FRAME_DURATION_MS)
                 } catch (e: Exception) {
@@ -219,12 +220,13 @@ class VirtualCameraService : Service() {
         val intent = Intent(this, MainActivity::class.java)
         val pendingIntent = android.app.PendingIntent.getActivity(
             this, 0, intent,
-            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
+            android.app.PendingIntent.FLAG_IMMUTABLE or
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT
         )
 
         val builder = android.app.Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("KYC Bypasser")
-            .setContentText("Virtual camera is active")
+            .setContentText("Overlay is active — camera preview replaced")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -234,9 +236,10 @@ class VirtualCameraService : Service() {
                 CHANNEL_ID,
                 "KYC Bypasser Virtual Camera",
                 NotificationManager.IMPORTANCE_LOW
-            )
-            channel.setSound(null, null)
-            channel.setShowBadge(false)
+            ).apply {
+                setSound(null, null)
+                setShowBadge(false)
+            }
             getSystemService(NotificationManager::class.java)
                 .createNotificationChannel(channel)
         }
@@ -251,10 +254,16 @@ class VirtualCameraService : Service() {
                 Log.d(LOG_TAG, "Virtual camera stopping")
                 isRunning = false
                 renderThread?.interrupt()
-                cameraSession?.close()
-                cameraDevice?.close()
-                surface?.release()
-                surfaceTexture?.release()
+                mainHandler.post {
+                    try {
+                        overlayView?.let { wm ->
+                            windowManager?.removeView(wm)
+                        }
+                    } catch (e: Exception) {
+                        Log.e(LOG_TAG, "Failed to remove overlay: ${e.message}", e)
+                    }
+                    overlayView = null
+                }
                 stopForeground(true)
                 stopSelf()
             }
@@ -266,10 +275,16 @@ class VirtualCameraService : Service() {
         Log.d(LOG_TAG, "VirtualCameraService destroyed")
         isRunning = false
         renderThread?.interrupt()
-        cameraSession?.close()
-        cameraDevice?.close()
-        surface?.release()
-        surfaceTexture?.release()
+        mainHandler.post {
+            try {
+                overlayView?.let { wm ->
+                    windowManager?.removeView(wm)
+                }
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "Failed to remove overlay: ${e.message}", e)
+            }
+            overlayView = null
+        }
         stopForeground(true)
         stopSelf()
         super.onDestroy()
