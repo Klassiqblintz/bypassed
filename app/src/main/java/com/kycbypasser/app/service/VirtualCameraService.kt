@@ -194,11 +194,12 @@ class VirtualCameraService : Service() {
                         }
                     }
 
-                    val outIdx = decoder.dequeueOutputBuffer(decoder.Info(), FRAME_DURATION_MS)
+                    val outIdx = decoder.dequeueOutputBuffer(
+                        object : MediaCodec.BufferInfo() {}, FRAME_DURATION_MS
+                    )
                     when {
                         outIdx >= 0 -> {
                             decoder.releaseOutputBuffer(outIdx, false)
-                            if (outIdx >= decoder.outputBufferCount) done = true
                         }
                         outIdx == android.media.MediaCodec.INFO_TRY_AGAIN_LATER -> {
                             Thread.sleep(10)

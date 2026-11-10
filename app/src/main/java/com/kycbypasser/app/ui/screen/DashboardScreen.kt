@@ -111,13 +111,13 @@ fun DashboardScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             StatCard(
-                icon = Icons.Default.List,
+                icon = Icons.Default.PlayArrow,
                 title = "Targets",
                 value = state.selectedTargetPackages.size.toString(),
                 modifier = Modifier.weight(1f)
             )
             StatCard(
-                icon = Icons.Default.Photo,
+                icon = Icons.Default.CheckCircle,
                 title = "Image",
                 value = if (state.selectedImagePath != null) "SET" else "NONE",
                 modifier = Modifier.weight(1f)
@@ -164,7 +164,7 @@ fun DashboardScreen(
                         .fillMaxWidth()
                         .padding(bottom = 8.dp)
                 ) {
-                    Icon(Icons.Default.List, null)
+                    Icon(Icons.Default.Settings, null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("MANAGE TARGETS")
                 }
@@ -173,7 +173,7 @@ fun DashboardScreen(
                     onClick = { /* Navigation handled by parent */ },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.PhotoCamera, null)
+                    Icon(Icons.Default.PlayArrow, null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("MANAGE MEDIA")
                 }
