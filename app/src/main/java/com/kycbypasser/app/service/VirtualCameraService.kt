@@ -9,7 +9,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Rect
-import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
@@ -22,7 +21,6 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import android.view.Surface
-import android.view.SurfaceTexture
 import com.kycbypasser.app.KycState
 import com.kycbypasser.app.MainActivity
 
@@ -53,7 +51,7 @@ class VirtualCameraService : Service() {
     // Camera
     private var cameraDevice: CameraDevice? = null
     private var captureSession: CameraCaptureSession? = null
-    private var cameraTexture: SurfaceTexture? = null
+    private var cameraTexture: android.graphics.SurfaceTexture? = null
     private var cameraSurface: Surface? = null
     private var cameraId: String? = null
 
@@ -169,7 +167,7 @@ class VirtualCameraService : Service() {
 
     private fun createCameraSurface() {
         try {
-            cameraTexture = SurfaceTexture(1).apply {
+            cameraTexture = android.graphics.SurfaceTexture(1).apply {
                 setDefaultBufferSize(720, 1280)
                 setOnFrameAvailableListener {
                     // Each time a new camera frame is available, draw our image on top
@@ -177,7 +175,7 @@ class VirtualCameraService : Service() {
                 }
             }
             cameraSurface = Surface(cameraTexture)
-            Log.d(LOG_TAG, "Camera surface created, texture id = ${cameraTexture!!.getTextureId()}")
+            Log.d(LOG_TAG, "Camera surface created")
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to create camera surface: ${e.message}", e)
         }
@@ -195,7 +193,7 @@ class VirtualCameraService : Service() {
             cameraTexture?.updateTexImage()
 
             // Get the transform matrix (handles camera orientation)
-            val transform = android.graphics.Matrix()
+            val transform = FloatArray(16)
             cameraTexture?.getTransformMatrix(transform)
 
             // Lock the surface canvas
