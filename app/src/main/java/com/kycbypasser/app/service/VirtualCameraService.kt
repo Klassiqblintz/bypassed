@@ -17,8 +17,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
-import android.view.Surface
-import android.graphics.SurfaceTexture
 import com.kycbypasser.app.KycState
 import com.kycbypasser.app.MainActivity
 
@@ -43,8 +41,8 @@ class VirtualCameraService : Service() {
 
     private var cameraDevice: CameraDevice? = null
     private var cameraSession: CameraCaptureSession? = null
-    private var surfaceTexture: SurfaceTexture? = null
-    private var surface: Surface? = null
+    private var surfaceTexture: android.graphics.SurfaceTexture? = null
+    private var surface: android.view.Surface? = null
     private var currentImage: Bitmap? = null
     private var currentVideoPath: String? = null
     private var currentMode: String = "static"
@@ -136,10 +134,10 @@ class VirtualCameraService : Service() {
 
     private fun createSurface() {
         try {
-            surfaceTexture = SurfaceTexture(1)
+            surfaceTexture = android.graphics.SurfaceTexture(1)
             surfaceTexture?.setDefaultBufferSize(720, 1280)
-            surface = Surface(surfaceTexture)
-            Log.d(LOG_TAG, "Surface created: ${surfaceTexture?.getTextureId()}")
+            surface = android.view.Surface(surfaceTexture)
+            Log.d(LOG_TAG, "Surface created, texture id = ${surfaceTexture?.getTextureId()}")
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to create surface: ${e.message}", e)
         }
