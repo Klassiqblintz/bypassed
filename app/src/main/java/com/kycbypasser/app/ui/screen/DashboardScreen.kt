@@ -105,13 +105,13 @@ fun DashboardScreen() {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             StatCard(
-                icon = Icons.Default.Dashboard,
+                icon = Icons.Default.Settings,
                 title = "Targets",
                 value = targetCount.toString(),
                 modifier = Modifier.weight(1f)
             )
             StatCard(
-                icon = Icons.Default.Photo,
+                icon = Icons.Default.Image,
                 title = "Image",
                 value = if (hasImage) "SET" else "NONE",
                 modifier = Modifier.weight(1f)
@@ -129,7 +129,7 @@ fun DashboardScreen() {
                 modifier = Modifier.weight(1f)
             )
             StatCard(
-                icon = Icons.Default.Security,
+                icon = Icons.Default.Settings,
                 title = "Mode",
                 value = "STATIC",
                 modifier = Modifier.weight(1f)
@@ -158,7 +158,7 @@ fun DashboardScreen() {
                         .fillMaxWidth()
                         .padding(bottom = 8.dp)
                 ) {
-                    Icon(Icons.Default.Dashboard, null)
+                    Icon(Icons.Default.Settings, null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("MANAGE TARGETS")
                 }
@@ -167,7 +167,7 @@ fun DashboardScreen() {
                     onClick = { /* Navigate to media */ },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Photo, null)
+                    Icon(Icons.Default.Image, null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("MANAGE MEDIA")
                 }

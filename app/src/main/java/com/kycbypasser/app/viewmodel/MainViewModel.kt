@@ -5,12 +5,12 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.kycbypasser.app.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
+
 
 /**
  * Main ViewModel managing all app state.
@@ -18,6 +18,8 @@ import java.io.File
  * and liveness mode settings.
  */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+
+    private const val APP_VERSION = "1.0.0"
 
     // ── State ──
     private val _isActive = MutableStateFlow(false)
@@ -127,7 +129,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ── Scan Available Packages ──
     private fun scanAvailablePackages() {
         viewModelScope.launch {
-            val pm = getApplication<Context>().packageManager
+            val pm = getApplication<Application>().packageManager
             val packages = pm.getInstalledPackages(0)
                 .map { it.packageName }
                 .sorted()
@@ -178,7 +180,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ── Media Selection ──
     fun selectMedia(uri: Uri) {
         viewModelScope.launch {
-            val ctx = getApplication<Context>()
+            val ctx = getApplication<Application>()
             // Copy file to internal storage for reliability
             val outFile = File(ctx.cacheDir, "injected_media")
             ctx.contentResolver.openInputStream(uri)?.use { input ->

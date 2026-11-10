@@ -11,7 +11,7 @@ import java.io.*
 object SocketCompat {
     private val LocalSocketClass by lazy { Class.forName("java.net.LocalSocket") }
     private val LocalServerSocketClass by lazy { Class.forName("java.net.LocalServerSocket") }
-    private val LocalSocketAddressClass by lazy { Class.forName("java.net.LocalSocketAddress") }
+    internal val LocalSocketAddressClass by lazy { Class.forName("java.net.LocalSocketAddress") }
     private val NamespaceClass by lazy { LocalSocketAddressClass.getDeclaredField("Namespace").get(null) }
     private val Absolute by lazy { NamespaceClass!!.javaClass.getDeclaredField("ABSOLUTE").get(null) }
 

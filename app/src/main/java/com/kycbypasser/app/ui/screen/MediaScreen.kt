@@ -150,7 +150,7 @@ fun MediaScreen() {
                         onClick = { imageLauncher.launch("image/*") },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Photo, null)
+                        Icon(Icons.Default.Image, null)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("CHOOSE IMAGE")
                     }
@@ -261,7 +261,7 @@ fun MediaScreen() {
                     .fillMaxWidth()
                     .padding(top = 8.dp)
             ) {
-                Icon(Icons.Default.SaveAs, null)
+                Icon(Icons.Default.Save, null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("SAVE MEDIA")
             }

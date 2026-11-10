@@ -58,7 +58,6 @@ val CustomDarkColorScheme = darkColorScheme(
     onSurface = Color.White,
     error = WarningOrange,
     errorContainer = Color(0xFF4A1C00),
-    success = SuccessGreen,
 )
 
 @Composable

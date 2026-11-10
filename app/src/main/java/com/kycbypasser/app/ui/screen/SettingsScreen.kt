@@ -237,7 +237,7 @@ fun SettingsScreen() {
                 .fillMaxWidth()
                 .padding(top = 16.dp)
         ) {
-            Icon(Icons.Default.SaveAs, null)
+            Icon(Icons.Default.Save, null)
             Spacer(modifier = Modifier.width(8.dp))
             Text("SAVE SETTINGS")
         }
