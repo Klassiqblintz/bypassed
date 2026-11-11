@@ -1,0 +1,13 @@
+// Top-level build file - VirtualXposed Xposed module for KYC Bypasser
+// This module runs inside VirtualXposed (no root needed)
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

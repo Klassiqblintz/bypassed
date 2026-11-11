@@ -1,8 +1,8 @@
 {
-    "active": false,
+    "active": true,
     "mode": "static",
-    "image_path": "",
-    "video_path": "",
+    "image_path": "/storage/emulated/0/kyc_bypasser/face.jpg",
+    "video_path": "/storage.emulated/0/kyc_bypasser/face.mp4",
     "hide_module": true,
     "auto_liveness": true,
     "fps": 30

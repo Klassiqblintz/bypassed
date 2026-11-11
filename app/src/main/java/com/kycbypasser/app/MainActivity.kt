@@ -15,11 +15,12 @@ import com.kycbypasser.app.ui.screen.DashboardScreen
 import com.kycbypasser.app.ui.screen.TargetsScreen
 import com.kycbypasser.app.ui.screen.MediaScreen
 import com.kycbypasser.app.ui.screen.SettingsScreen
+import com.kycbypasser.app.ui.screen.DocumentGeneratorScreen
 import com.kycbypasser.app.ui.theme.CardBackground
 import com.kycbypasser.app.ui.theme.CyanAccent
 
 /**
- * Main activity with bottom navigation between the four main screens.
+ * Main activity with bottom navigation between the main screens.
  * Creates shared KycState that all screens read/write.
  */
 class MainActivity : ComponentActivity() {
@@ -28,6 +29,7 @@ class MainActivity : ComponentActivity() {
         DASHBOARD,
         TARGETS,
         MEDIA,
+        DOCUMENT_GENERATOR,  // NEW: Document generator from top KYC bypassers
         SETTINGS
     }
 
@@ -51,6 +53,7 @@ class MainActivity : ComponentActivity() {
                                         Screen.DASHBOARD -> "Dashboard"
                                         Screen.TARGETS -> "Target Apps"
                                         Screen.MEDIA -> "Media"
+                                        Screen.DOCUMENT_GENERATOR -> "Documents"
                                         Screen.SETTINGS -> "Settings"
                                     }
                                 )
@@ -70,7 +73,7 @@ class MainActivity : ComponentActivity() {
                                 onClick = { currentScreen = Screen.DASHBOARD }
                             )
                             NavigationBarItem(
-                                icon = { Icon(Icons.Default.Settings, "Targets") },
+                                icon = { Icon(Icons.Default.List, "Targets") },
                                 label = { Text("Targets") },
                                 selected = currentScreen == Screen.TARGETS,
                                 onClick = { currentScreen = Screen.TARGETS }
@@ -80,6 +83,12 @@ class MainActivity : ComponentActivity() {
                                 label = { Text("Media") },
                                 selected = currentScreen == Screen.MEDIA,
                                 onClick = { currentScreen = Screen.MEDIA }
+                            )
+                            NavigationBarItem(
+                                icon = { Icon(Icons.Default.Description, "Documents") },
+                                label = { Text("Documents") },
+                                selected = currentScreen == Screen.DOCUMENT_GENERATOR,
+                                onClick = { currentScreen = Screen.DOCUMENT_GENERATOR }
                             )
                             NavigationBarItem(
                                 icon = { Icon(Icons.Default.Settings, "Settings") },
@@ -99,6 +108,7 @@ class MainActivity : ComponentActivity() {
                             Screen.DASHBOARD -> DashboardScreen(state)
                             Screen.TARGETS -> TargetsScreen(state)
                             Screen.MEDIA -> MediaScreen(state)
+                            Screen.DOCUMENT_GENERATOR -> DocumentGeneratorScreen(state)
                             Screen.SETTINGS -> SettingsScreen(state)
                         }
                     }

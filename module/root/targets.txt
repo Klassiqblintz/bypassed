@@ -1,4 +1,5 @@
-com.example.kycapp
-com.bank.app
-com.finance.kyc
-# Add more target packages below
+# Add target app package names, one per line
+# Examples:
+# com.example.app
+# com.bank.app
+# com.crypto.exchange

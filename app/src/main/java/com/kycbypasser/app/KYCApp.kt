@@ -28,12 +28,8 @@ class KYCApp : Application() {
         super.onCreate()
         instance = this
 
-        // Ensure module config directory exists (safe on non-rooted devices)
-        try {
-            ensureModuleDir()
-        } catch (e: Exception) {
-            android.util.Log.e("KYCApp", "Error creating module dir: ${e.message}")
-        }
+        // Ensure module config directory exists
+        ensureModuleDir()
     }
 
     /**

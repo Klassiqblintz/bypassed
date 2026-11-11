@@ -1,0 +1,6 @@
+XposedModule
+name=KYC Bypasser (Xposed)
+description=Camera hooking module for bypassing KYC — works in VirtualXposed (no root)
+author=KYC Bypasser Team
+minVersion=51
+rom=any

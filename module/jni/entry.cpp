@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <regex>
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "KYC_BYPASS", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "KYC_BYPASS", __VA_ARGS__)
@@ -23,11 +24,31 @@ public:
     }
 
     void preAppSpecialize(zygisk::AppSpecializeArgs *args) override {
-        const char *process = env->GetStringUTFChars(args->nice_name, nullptr);
+        const char *process = env->GetStringUTFChars((jstring)args->nice_name, nullptr);
 
         if (is_target_app(process)) {
             LOGD("Target app detected: %s - registering hooks", process);
             load_config();
+
+            // CRITICAL FIX: Copy instance config to global g_config
+            g_config = config;
+            g_config_loaded = true;
+            LOGD("Global config set: active=%d, mode=%d, fps=%d",
+                 g_config.active, g_config.mode, g_config.fps);
+
+            // CRITICAL FIX: Load image or video into frame_publisher state
+            // This was the #2 bug - s_bitmap was never populated
+            if (config.image_path[0] != '\0') {
+                if (config.mode == MODE_STATIC || config.mode == MODE_REALTIME) {
+                    load_image(env, config.image_path);
+                }
+            }
+            if (config.video_path[0] != '\0') {
+                if (config.mode == MODE_VIDEO) {
+                    load_video(config.video_path);
+                }
+            }
+
             register_camera_hooks(api, env);
             register_plt_hooks(api, env);
             register_metadata_hooks(api, env);
@@ -35,7 +56,7 @@ public:
             LOGD("Non-target app: %s", process);
         }
 
-        env->ReleaseStringUTFChars(args->nice_name, process);
+        env->ReleaseStringUTFChars((jstring)args->nice_name, process);
         api->setOption(zygisk::Option::DLCLOSE_MODULE_LIBRARY);
     }
 
@@ -79,64 +100,56 @@ private:
         char buffer[4096];
         size_t total = 0;
         while (!feof(f)) {
-            size_t n = fread(buffer + total, 1, sizeof(buffer) - total - 1, f);
+            size_t n = fread(buffer + total, 1, sizeof(buffer - total - 1), f);
             total += n;
         }
         buffer[total] = '\0';
         fclose(f);
 
-        if (strstr(buffer, "\"active\": true")) {
-            config.active = true;
-        } else {
-            config.active = false;
+        // Use regex for reliable JSON parsing instead of strstr
+        std::string json(buffer);
+
+        std::regex active_re("\"active\"\\s*:\\s*(true|false)");
+        std::smatch m;
+        if (std::regex_search(json, m, active_re)) {
+            config.active = (m[1] == "true");
         }
 
-        char *mode_pos = strstr(buffer, "\"mode\":");
-        if (mode_pos) {
-            if (strstr(mode_pos, "\"static\"")) {
-                config.mode = MODE_STATIC;
-            } else if (strstr(mode_pos, "\"video\"")) {
-                config.mode = MODE_VIDEO;
-            } else if (strstr(mode_pos, "\"realtime\"")) {
-                config.mode = MODE_REALTIME;
-            }
+        std::regex mode_re(R"DELIM("mode"\s*:\s*"([^"]+)")DELIM");
+        if (std::regex_search(json, m, mode_re)) {
+            std::string mode_str = m[1];
+            if (mode_str == "static") config.mode = MODE_STATIC;
+            else if (mode_str == "video") config.mode = MODE_VIDEO;
+            else if (mode_str == "realtime") config.mode = MODE_REALTIME;
         }
 
-        char *img_pos = strstr(buffer, "\"image_path\":");
-        if (img_pos) {
-            char *start = strchr(img_pos + 14, '"');
-            if (start) {
-                char *end = strchr(start + 1, '"');
-                if (end) {
-                    int len = end - start - 1;
-                    strncpy(config.image_path, start + 1, len);
-                    config.image_path[len] = '\0';
-                }
-            }
+        std::regex img_re(R"DELIM("image_path"\s*:\s*"([^"]+)")DELIM");
+        if (std::regex_search(json, m, img_re)) {
+            std::string img = m[1];
+            strncpy(config.image_path, img.c_str(), sizeof(config.image_path) - 1);
         }
 
-        char *vid_pos = strstr(buffer, "\"video_path\":");
-        if (vid_pos) {
-            char *start = strchr(vid_pos + 13, '"');
-            if (start) {
-                char *end = strchr(start + 1, '"');
-                if (end) {
-                    int len = end - start - 1;
-                    strncpy(config.video_path, start + 1, len);
-                    config.video_path[len] = '\0';
-                }
-            }
+        std::regex vid_re(R"DELIM("video_path"\s*:\s*"([^"]+)")DELIM");
+        if (std::regex_search(json, m, vid_re)) {
+            std::string vid = m[1];
+            strncpy(config.video_path, vid.c_str(), sizeof(config.video_path) - 1);
         }
 
-        char *fps_pos = strstr(buffer, "\"fps\":");
-        if (fps_pos) {
-            config.fps = atoi(fps_pos + 6);
+        std::regex fps_re("\"fps\"\\s*:\\s*(\\d+)");
+        if (std::regex_search(json, m, fps_re)) {
+            config.fps = std::stoi(m[1]);
             if (config.fps < 1) config.fps = 30;
         }
 
+        std::regex hide_re("\"hide_module\"\\s*:\\s*(true|false)");
+        if (std::regex_search(json, m, hide_re)) {
+            config.hide_module = (m[1] == "true");
+        }
+
         config_loaded = true;
-        LOGD("Config loaded: active=%d, mode=%d, fps=%d",
-             config.active, config.mode, config.fps);
+        LOGD("Config loaded: active=%d, mode=%d, fps=%d, img=%s, vid=%s",
+             config.active, config.mode, config.fps,
+             config.image_path, config.video_path);
         return true;
     }
 };

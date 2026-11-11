@@ -2,8 +2,11 @@
  * Metadata spoofing implementation.
  * Fakes CameraCharacteristics to make the virtual camera look like real hardware.
  *
- * Spoofed: SENSOR_INFO_PHYSICAL_SIZE, LENS_FOCAL_LENGTH,
- * NOISE_PROFILE, ROLLING_SHUTTER_TIMING, and various control modes.
+ * FIXES:
+ * - Now hooks BOTH getInt AND getFloat (previously only getInt, which caused
+ *   duplicate hook with camera_hook.cpp)
+ * - LENS_FOCAL_LENGTH handled via getFloat (returns float array)
+ * - Proper fallback to original for unhandled keys
  */
 #include "metadata_spoof.h"
 #include "camera_hook.h"
@@ -25,37 +28,66 @@ static const float NOISE_PROFILE[100] = {
 };
 static const float ROLLING_SHUTTER[2] = {0.001f, 0.001f};
 
+/*
+ * get_spoofed_int - handles integer-valued characteristics
+ * Returns -1 for float-type keys, 0 for boolean-like keys
+ * Falls back to original for unhandled keys
+ */
 int get_spoofed_int(JNIEnv *env, jobject key) {
-
     jclass keyClass = env->FindClass("android/hardware/camera2/CameraCharacteristics");
     jmethodID nameMethod = env->GetMethodID(keyClass, "name", "()Ljava/lang/String;");
     jstring keyName = (jstring)env->CallObjectMethod(key, nameMethod);
     const char *keyStr = env->GetStringUTFChars(keyName, nullptr);
 
-    if (strcmp(keyStr, "CameraCharacteristics.LENS_FOCAL_LENGTH") == 0) {
-        return static_cast<jint>(FOCAL_LENGTH);
-    }
+    // Integer-valued keys
     if (strcmp(keyStr, "CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL") == 0) {
+        env->ReleaseStringUTFChars(keyName, keyStr);
+        env->DeleteLocalRef(keyName);
         return 3; // FULL
     }
     if (strcmp(keyStr, "CameraCharacteristics.FLASH_INFO_AVAILABLE") == 0) {
+        env->ReleaseStringUTFChars(keyName, keyStr);
+        env->DeleteLocalRef(keyName);
         return 0;
     }
     if (strcmp(keyStr, "CameraCharacteristics.STATISTICS_INFO_MAX_REGIONS") == 0) {
+        env->ReleaseStringUTFChars(keyName, keyStr);
+        env->DeleteLocalRef(keyName);
         return 10;
     }
     if (strcmp(keyStr, "CameraCharacteristics.TEMPERATURE_AND_TIMING_SUPPORTED") == 0) {
+        env->ReleaseStringUTFChars(keyName, keyStr);
+        env->DeleteLocalRef(keyName);
         return 1;
+    }
+    if (strcmp(keyStr, "CameraCharacteristics.CONTROL_AE_MODE") == 0) {
+        env->ReleaseStringUTFChars(keyName, keyStr);
+        env->DeleteLocalRef(keyName);
+        return 3; // ON
+    }
+    if (strcmp(keyStr, "CameraCharacteristics.CONTROL_AF_MODE") == 0) {
+        env->ReleaseStringUTFChars(keyName, keyStr);
+        env->DeleteLocalRef(keyName);
+        return 2; // CONTINUOUS_PICTURE
+    }
+    // LENS_FOCAL_LENGTH as int - truncated value
+    if (strcmp(keyStr, "CameraCharacteristics.LENS_FOCAL_LENGTH") == 0) {
+        env->ReleaseStringUTFChars(keyName, keyStr);
+        env->DeleteLocalRef(keyName);
+        return 4; // 4.3f truncated to int (getFloat handles the real value)
     }
 
     env->ReleaseStringUTFChars(keyName, keyStr);
     env->DeleteLocalRef(keyName);
-    return 0;
+    return -1;  // Not handled - caller should use original
 }
 
+/*
+ * get_spoofed_float - HANDLES FLOAT KEYS
+ * This is the REAL fix - LENS_FOCAL_LENGTH and SENSOR_INFO_PHYSICAL_SIZE
+ * are float arrays and were previously returning wrong types
+ */
 jfloatArray get_spoofed_float(JNIEnv *env, jobject key) {
-
-
     jclass keyClass = env->FindClass("android/hardware/camera2/CameraCharacteristics");
     jmethodID nameMethod = env->GetMethodID(keyClass, "name", "()Ljava/lang/String;");
     jstring keyName = (jstring)env->CallObjectMethod(key, nameMethod);
@@ -87,21 +119,25 @@ jfloatArray get_spoofed_float(JNIEnv *env, jobject key) {
 
     env->ReleaseStringUTFChars(keyName, keyStr);
     env->DeleteLocalRef(keyName);
-    return nullptr;
+    return nullptr;  // Not handled
 }
 
 void register_metadata_hooks(void *api_ptr, JNIEnv *env) {
     auto *api = (zygisk::Api *)api_ptr;
 
+    // Hook BOTH getInt and getFloat - FIX for proper float handling
     JNINativeMethod methods[] = {
         { "getInt",
           "(Landroid/hardware/camera2/CameraMetadata;Landroid/hardware/camera2/CameraCharacteristics;)I",
-          (void*)hook_camera2_get_int },
+          (void*)get_spoofed_int },
+        { "getFloat",
+          "(Landroid/hardware/camera2/CameraMetadata;Landroid/hardware/camera2/CameraCharacteristics;)[F",
+          (void*)get_spoofed_float },
     };
 
     api->hookJniNativeMethods(env,
         "android/hardware/camera2/CameraCharacteristics",
-        methods, 1);
+        methods, 2);
 
-    LOGD("Metadata hooks registered");
+    LOGD("Metadata hooks registered (getInt + getFloat)");
 }
