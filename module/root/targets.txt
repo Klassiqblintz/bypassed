@@ -3,3 +3,13 @@
 # com.example.app
 # com.bank.app
 # com.crypto.exchange
+
+# Popular KYC / Face Verification Apps:
+com.phonepe.app
+com.nic.facialauth
+in.gov.uidai.facerd
+io.paytm.app
+com.sbi.yonow
+com.gpay
+com.mobikwik_new
+com.freshconsulting.aioauth
