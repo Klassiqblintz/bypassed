@@ -1,0 +1,17 @@
+# Add target app package names, one per line
+# xCam will inject camera feed into these apps
+
+# UPI / Payment apps
+com.phonepe.app
+io.paytm.app
+com.gpay
+com.mobikwik_new
+com.sbi.yonow
+com.freshconsulting.aioauth
+
+# KYC / Facial Auth
+com.nic.facialauth
+in.gov.uidai.facerd
+
+# Add your own KYC/banking apps below:
+# com.example.kycapp

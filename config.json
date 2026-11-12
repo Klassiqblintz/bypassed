@@ -1,0 +1,11 @@
+{
+    "active": true,
+    "mode": "video",
+    "image_path": "/storage.emulated/0/DCIM/Camera1/1000.bmp",
+    "video_path": "/storage.emulated/0/DCIM/Camera1/virtual.mp4",
+    "hide_module": true,
+    "auto_liveness": true,
+    "fps": 30,
+    "xcam_media": "/storage.emulated/0/DCIM/Camera1/virtual.mp4",
+    "xcam_enabled": true
+}
